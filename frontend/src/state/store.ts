@@ -1,13 +1,69 @@
-import type { AppState, ChordConfig, GenerationResult, Inversion, Modo, Variacion } from '../types';
+import type {
+  AppState,
+  ChordConfig,
+  GenerationResult,
+  Inversion,
+  Modo,
+  SavedProgression,
+  Variacion,
+} from '../types';
 import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
 
 const listeners = new Set<(state: AppState) => void>();
 
+function createId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `prog-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+}
+
+function normaliseSavedProgressions(list?: SavedProgression[]): SavedProgression[] {
+  if (!list || !Array.isArray(list) || list.length === 0) {
+    return [];
+  }
+  const seen = new Set<string>();
+  return list
+    .slice()
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .filter((item) => {
+      if (!item || seen.has(item.id)) {
+        return false;
+      }
+      seen.add(item.id);
+      return true;
+    })
+    .map((item) => ({
+      ...item,
+      name: item.name.trim() || 'Progresión guardada',
+      progression: item.progression.trim(),
+    }));
+}
+
+function createDefaultProgressionName(current: SavedProgression[]): string {
+  const existingNames = new Set(current.map((item) => item.name));
+  let index = current.length + 1;
+  let candidate = `Progresión ${index}`;
+  while (existingNames.has(candidate)) {
+    index += 1;
+    candidate = `Progresión ${index}`;
+  }
+  return candidate;
+}
+
 function createInitialState(): AppState {
   const persisted = loadPreferences();
-  const progressionInput = persisted?.progressionInput ?? 'Cmaj7 F7 | G7 Cmaj7';
+  const savedProgressions = normaliseSavedProgressions(persisted?.savedProgressions);
+  const activeFromPersisted =
+    persisted?.activeProgressionId && savedProgressions.some((item) => item.id === persisted.activeProgressionId)
+      ? persisted.activeProgressionId
+      : null;
+  const activeProgression = activeFromPersisted
+    ? savedProgressions.find((item) => item.id === activeFromPersisted) ?? null
+    : null;
+  const progressionInput = activeProgression?.progression ?? persisted?.progressionInput ?? 'Cmaj7 F7 | G7 Cmaj7';
   const base: AppState = {
     progressionInput,
     clave: persisted?.clave && CLAVES[persisted.clave] ? persisted.clave : 'Clave 2-3',
@@ -28,6 +84,8 @@ function createInitialState(): AppState {
     errors: [],
     isPlaying: false,
     generated: undefined,
+    savedProgressions,
+    activeProgressionId: activeFromPersisted,
   };
   const { chords, errors } = buildChords(base.progressionInput, base);
   base.chords = chords;
@@ -83,14 +141,35 @@ function updateState(partial: Partial<AppState>): void {
   persist();
 }
 
-export function setProgression(progressionInput: string): void {
+function applyProgression(
+  progressionInput: string,
+  options?: {
+    activeProgressionId?: string | null;
+  }
+): void {
   const { chords, errors } = buildChords(progressionInput, {
     modoDefault: state.modoDefault,
     armonizacionDefault: state.armonizacionDefault,
     inversionDefault: state.inversionDefault,
     chords: state.chords,
   });
-  updateState({ progressionInput, chords, errors, generated: undefined });
+  let nextActiveId: string | null = state.activeProgressionId;
+  if (options && 'activeProgressionId' in options) {
+    nextActiveId = options.activeProgressionId ?? null;
+  } else {
+    const currentActive = nextActiveId
+      ? state.savedProgressions.find((item) => item.id === nextActiveId)
+      : undefined;
+    if (!currentActive || currentActive.progression !== progressionInput) {
+      const matching = state.savedProgressions.find((item) => item.progression === progressionInput);
+      nextActiveId = matching ? matching.id : null;
+    }
+  }
+  updateState({ progressionInput, chords, errors, generated: undefined, activeProgressionId: nextActiveId });
+}
+
+export function setProgression(progressionInput: string): void {
+  applyProgression(progressionInput);
 }
 
 export function setDefaultModo(modo: Modo): void {
@@ -152,4 +231,72 @@ export function setIsPlaying(isPlaying: boolean): void {
 
 export function resetPlayback(): void {
   setIsPlaying(false);
+}
+
+export function saveCurrentProgression(name: string): void {
+  const trimmedProgression = state.progressionInput.trim();
+  if (!trimmedProgression || state.errors.length > 0) {
+    return;
+  }
+  const now = new Date().toISOString();
+  const existingActive = state.activeProgressionId
+    ? state.savedProgressions.find((item) => item.id === state.activeProgressionId)
+    : undefined;
+  const desiredName = name.trim();
+  let nextSaved: SavedProgression;
+  let savedProgressions: SavedProgression[];
+
+  if (existingActive) {
+    const finalName = desiredName || existingActive.name;
+    nextSaved = {
+      ...existingActive,
+      name: finalName,
+      progression: trimmedProgression,
+      updatedAt: now,
+    };
+    savedProgressions = [nextSaved, ...state.savedProgressions.filter((item) => item.id !== existingActive.id)];
+  } else {
+    const duplicate = state.savedProgressions.find((item) => item.progression === trimmedProgression);
+    const finalName = desiredName || duplicate?.name || createDefaultProgressionName(state.savedProgressions);
+    if (duplicate) {
+      nextSaved = {
+        ...duplicate,
+        name: finalName,
+        progression: trimmedProgression,
+        updatedAt: now,
+      };
+      savedProgressions = [nextSaved, ...state.savedProgressions.filter((item) => item.id !== duplicate.id)];
+    } else {
+      nextSaved = {
+        id: createId(),
+        name: finalName,
+        progression: trimmedProgression,
+        updatedAt: now,
+      };
+      savedProgressions = [nextSaved, ...state.savedProgressions];
+    }
+  }
+
+  updateState({ savedProgressions, activeProgressionId: nextSaved.id });
+}
+
+export function loadSavedProgression(id: string): void {
+  const saved = state.savedProgressions.find((item) => item.id === id);
+  if (!saved) {
+    return;
+  }
+  applyProgression(saved.progression, { activeProgressionId: saved.id });
+}
+
+export function deleteSavedProgression(id: string): void {
+  if (!state.savedProgressions.some((item) => item.id === id)) {
+    return;
+  }
+  const remaining = state.savedProgressions.filter((item) => item.id !== id);
+  let nextActiveId = state.activeProgressionId;
+  if (state.activeProgressionId === id) {
+    const match = remaining.find((item) => item.progression === state.progressionInput.trim());
+    nextActiveId = match ? match.id : null;
+  }
+  updateState({ savedProgressions: remaining, activeProgressionId: nextActiveId ?? null });
 }
