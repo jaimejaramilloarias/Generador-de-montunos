@@ -80,6 +80,116 @@ body {
   gap: 1rem;
 }
 
+.saved-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.saved-controls__input {
+  flex: 1 1 220px;
+}
+
+.saved-controls__input input {
+  width: 100%;
+}
+
+.saved-list {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.saved-list__empty {
+  color: rgba(235, 244, 255, 0.65);
+  font-size: 0.95rem;
+}
+
+.saved-list__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  background: rgba(6, 15, 32, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.saved-list__item--active {
+  border-color: rgba(116, 205, 255, 0.55);
+  background: rgba(14, 40, 70, 0.7);
+  box-shadow: 0 0 0 1px rgba(116, 205, 255, 0.25);
+}
+
+.saved-list__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.saved-list__name {
+  font-weight: 600;
+}
+
+.saved-list__preview {
+  font-size: 0.9rem;
+  color: rgba(235, 244, 255, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saved-list__timestamp {
+  font-size: 0.8rem;
+  color: rgba(235, 244, 255, 0.55);
+}
+
+.saved-list__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.5rem;
+}
+
+.saved-list__action {
+  border: none;
+  border-radius: 999px;
+  background: rgba(116, 205, 255, 0.18);
+  color: #e8f7ff;
+  padding: 0.4rem 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.saved-list__action:hover {
+  background: rgba(116, 205, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.saved-list__action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.saved-list__action--danger {
+  background: rgba(255, 121, 121, 0.2);
+  color: #ffd7d7;
+}
+
+.saved-list__action--danger:hover {
+  background: rgba(255, 121, 121, 0.35);
+}
+
 .panel__section-header {
   margin-bottom: 1rem;
 }
@@ -250,5 +360,19 @@ input[type='number'] {
   }
   .app {
     padding: 1.5rem;
+  }
+
+  .saved-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .saved-list__item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .saved-list__actions {
+    justify-content: flex-end;
   }
 }

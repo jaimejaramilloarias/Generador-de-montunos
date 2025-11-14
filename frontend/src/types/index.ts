@@ -11,6 +11,13 @@ export interface ChordConfig {
   inversion: Inversion;
 }
 
+export interface SavedProgression {
+  id: string;
+  name: string;
+  progression: string;
+  updatedAt: string;
+}
+
 export interface AppState {
   progressionInput: string;
   clave: string;
@@ -24,6 +31,8 @@ export interface AppState {
   errors: string[];
   isPlaying: boolean;
   generated?: GenerationResult;
+  savedProgressions: SavedProgression[];
+  activeProgressionId: string | null;
 }
 
 export interface GenerationResult {
@@ -48,6 +57,8 @@ export interface PersistedState {
   variation: Variacion;
   inversionDefault: Inversion;
   bpm: number;
+  savedProgressions?: SavedProgression[];
+  activeProgressionId?: string | null;
 }
 
 export interface ParsedChord {
