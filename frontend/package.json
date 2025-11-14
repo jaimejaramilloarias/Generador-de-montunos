@@ -7,10 +7,17 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "build:pages": "vite build --mode production"
+    "build:pages": "vite build --mode production",
+    "test": "vitest"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
-    "vite": "^5.2.0"
+    "vite": "^5.2.0",
+    "vitest": "^4.0.9"
+  },
+  "dependencies": {
+    "@tonejs/midi": "^2.0.28",
+    "tone": "^15.1.22",
+    "zod": "^4.1.12"
   }
 }

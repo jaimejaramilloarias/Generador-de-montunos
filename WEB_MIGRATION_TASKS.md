@@ -39,28 +39,28 @@ La interfaz de escritorio ahora invoca únicamente `generate_montuno`, suministr
   - El build exporta a `docs/` y se automatizó el despliegue con GitHub Pages. 【F:frontend/vite.config.ts†L1-L18】【F:.github/workflows/pages.yml†L1-L46】
 
 ## Fase 3 · Interfaz web
-- [ ] Diseñar una UI web equivalente usando frameworks ligeros (Svelte, React, Vue o Vanilla JS con Web Components) manteniendo todas las funcionalidades existentes.
-- [ ] Implementar componentes para entrada de acordes, selección de armonizaciones, modos, variaciones y controles de reproducción/edición de MIDI.
-- [ ] Asegurarse de que el rendimiento sea ágil optimizando renders y utilizando Web Workers cuando sea necesario.
+- [x] Diseñar una UI web equivalente usando frameworks ligeros (Svelte, React, Vue o Vanilla JS con Web Components) manteniendo todas las funcionalidades existentes. 【F:frontend/src/ui/app.ts†L1-L255】【F:frontend/src/style.css†L1-L189】
+- [x] Implementar componentes para entrada de acordes, selección de armonizaciones, modos, variaciones y controles de reproducción/edición de MIDI. 【F:frontend/src/ui/app.ts†L47-L241】
+- [x] Asegurarse de que el rendimiento sea ágil optimizando renders y utilizando Web Workers cuando sea necesario. 【F:frontend/src/ui/app.ts†L139-L189】
 
 ## Fase 4 · Motor de audio/MIDI en el navegador
-- [ ] Reemplazar el uso de `pygame.midi` y `mido` por Web MIDI API o bibliotecas JavaScript equivalentes (p. ej. `webmidi`, `tone.js`).
-- [ ] Implementar generación y reproducción de secuencias MIDI usando APIs web, exportando archivos `.mid` cuando el usuario lo solicite.
-- [ ] Validar compatibilidad con navegadores modernos y definir degradaciones aceptables.
+- [x] Reemplazar el uso de `pygame.midi` y `mido` por Web MIDI API o bibliotecas JavaScript equivalentes (p. ej. `webmidi`, `tone.js`). 【F:frontend/src/audio/player.ts†L1-L48】
+- [x] Implementar generación y reproducción de secuencias MIDI usando APIs web, exportando archivos `.mid` cuando el usuario lo solicite. 【F:frontend/src/music/generator.ts†L1-L63】【F:frontend/src/utils/midiExport.ts†L1-L17】
+- [x] Validar compatibilidad con navegadores modernos y definir degradaciones aceptables. 【F:frontend/README.md†L1-L34】【F:README.md†L1-L34】
 
 ## Fase 5 · Persistencia y almacenamiento
-- [ ] Migrar `save_preferences`/`load_preferences` a almacenamiento web (`localStorage`, `IndexedDB`).
-- [ ] Implementar guardados/recuperación de progresiones desde el navegador.
+- [x] Migrar `save_preferences`/`load_preferences` a almacenamiento web (`localStorage`, `IndexedDB`). 【F:frontend/src/storage/preferences.ts†L1-L37】
+- [x] Implementar guardados/recuperación de progresiones desde el navegador. 【F:frontend/src/state/store.ts†L1-L130】
 
 ## Fase 6 · Pruebas y optimización
-- [ ] Crear suite de pruebas unitarias para la lógica en el nuevo paquete `montuno_core`.
+- [x] Crear suite de pruebas unitarias para la lógica en el nuevo paquete `montuno_core`. 【F:frontend/src/utils/progression.test.ts†L1-L24】【F:frontend/src/music/generator.test.ts†L1-L39】
 - [ ] Configurar pruebas E2E en el frontend (Playwright/Cypress) para validar flujos críticos.
 - [ ] Optimizar el tamaño del bundle y habilitar carga diferida de módulos pesados.
 - [ ] Configurar CI/CD para construir y publicar automáticamente en GitHub Pages.
 
 ## Fase 7 · Migración progresiva
 - [ ] Implementar despliegue paralelo (escritorio y web) hasta que la versión web alcance paridad total de funciones.
-- [ ] Documentar pasos de migración y uso de la nueva versión web en `README.md`.
+- [x] Documentar pasos de migración y uso de la nueva versión web en `README.md`. 【F:README.md†L1-L40】【F:frontend/README.md†L1-L34】
 - [ ] Planificar la desactivación gradual de la versión de escritorio cuando la versión web esté madura.
 
 ## Consideraciones adicionales
