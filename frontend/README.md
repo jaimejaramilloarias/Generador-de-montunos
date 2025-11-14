@@ -10,14 +10,17 @@ npm run dev       # inicia el servidor de desarrollo en http://localhost:5173
 npm run build     # genera la versión de producción
 npm run build:pages  # genera la versión de producción en ../docs para GitHub Pages
 npm run preview   # previsualiza la build de producción en http://localhost:4173
-npm run test      # ejecuta las pruebas unitarias con Vitest
+npm run test      # ejecuta las pruebas unitarias con Vitest en modo "run"
+npm run test:watch  # vitest en modo interactivo
+npm run test:e2e  # ejecuta las pruebas de extremo a extremo con Playwright (requiere instalar los navegadores)
+npm run test:ci   # agrupa unitarias y E2E
 ```
 
 ## Despliegue en GitHub Pages
 
 El archivo `vite.config.ts` está configurado para exportar los artefactos dentro de la carpeta `docs/`. GitHub Pages puede apuntar directamente a esa carpeta para servir la aplicación.
 
-Además, el workflow de GitHub Actions (`.github/workflows/pages.yml`) automatiza la construcción y publicación en GitHub Pages cuando se realizan cambios en la rama principal.
+Además, el workflow de GitHub Actions (`.github/workflows/pages.yml`) automatiza la construcción, ejecución de pruebas (unitarias y E2E) y publicación en GitHub Pages cuando se realizan cambios en la rama principal. También empaqueta la aplicación de escritorio como artefacto para mantener despliegue paralelo.
 
 ## Características principales
 

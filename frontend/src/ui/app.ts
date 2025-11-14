@@ -16,10 +16,15 @@ import {
   subscribe,
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
-import type { AppState, ChordConfig } from '../types';
-import { generateMontuno } from '../music/generator';
-import { loadSequence, play as playAudio, stop as stopAudio, isPlaying as audioIsPlaying } from '../audio/player';
-import { generateMidiBlob } from '../utils/midiExport';
+import type { AppState, ChordConfig, GenerationResult } from '../types';
+
+type GeneratorModule = typeof import('../music/generator');
+type AudioModule = typeof import('../audio/player');
+type MidiExportModule = typeof import('../utils/midiExport');
+
+let generatorModulePromise: Promise<GeneratorModule> | null = null;
+let audioModulePromise: Promise<AudioModule> | null = null;
+let midiModulePromise: Promise<MidiExportModule> | null = null;
 
 interface UiRefs {
   progressionInput: HTMLTextAreaElement;
@@ -38,11 +43,41 @@ interface UiRefs {
   summary: HTMLDivElement;
 }
 
+function getGeneratorModule(): Promise<GeneratorModule> {
+  if (!generatorModulePromise) {
+    generatorModulePromise = import('../music/generator');
+  }
+  return generatorModulePromise;
+}
+
+function getAudioModule(): Promise<AudioModule> {
+  if (!audioModulePromise) {
+    audioModulePromise = import('../audio/player');
+  }
+  return audioModulePromise;
+}
+
+function getMidiModule(): Promise<MidiExportModule> {
+  if (!midiModulePromise) {
+    midiModulePromise = import('../utils/midiExport');
+  }
+  return midiModulePromise;
+}
+
+function scheduleModulePrefetch(): void {
+  window.setTimeout(() => {
+    void getGeneratorModule();
+    void getAudioModule();
+    void getMidiModule();
+  }, 250);
+}
+
 export function setupApp(root: HTMLElement): void {
   root.innerHTML = buildLayout();
   const refs = grabRefs(root);
   bindStaticEvents(refs, root);
   subscribe((state) => updateUi(state, refs));
+  scheduleModulePrefetch();
 }
 
 function buildLayout(): string {
@@ -221,33 +256,39 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
   });
 
   refs.playBtn.addEventListener('click', async () => {
-    const state = getState();
-    if (!state.generated) {
-      await handleGenerate(refs);
-      return;
+    const audio = await getAudioModule();
+    let state = getState();
+    let result = state.generated;
+    if (!result) {
+      result = await handleGenerate(refs);
+      state = getState();
+      if (!result) {
+        return;
+      }
     }
-    if (state.isPlaying || audioIsPlaying()) {
-      stopAudio();
+    if (state.isPlaying || audio.isPlaying()) {
+      audio.stop();
       resetPlayback();
       setIsPlaying(false);
       return;
     }
-    await loadSequence(state.generated.events, state.generated.bpm);
-    playAudio();
+    await audio.loadSequence(result.events, result.bpm);
+    audio.play();
     setIsPlaying(true);
     window.setTimeout(() => {
-      if (audioIsPlaying()) {
-        stopAudio();
+      if (audio.isPlaying()) {
+        audio.stop();
       }
       setIsPlaying(false);
-    }, state.generated.durationSeconds * 1000 + 100);
+    }, result.durationSeconds * 1000 + 100);
   });
 
-  refs.downloadBtn.addEventListener('click', () => {
+  refs.downloadBtn.addEventListener('click', async () => {
     const state = getState();
     if (!state.generated) {
       return;
     }
+    const { generateMidiBlob } = await getMidiModule();
     const blob = generateMidiBlob(state.generated);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -260,22 +301,25 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
   });
 }
 
-async function handleGenerate(refs: UiRefs): Promise<void> {
+async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefined> {
   const state = getState();
   if (state.errors.length) {
-    return;
+    return undefined;
   }
   try {
-    const result = generateMontuno(state);
-    await loadSequence(result.events, result.bpm);
+    const [generator, audio] = await Promise.all([getGeneratorModule(), getAudioModule()]);
+    const result = generator.generateMontuno(state);
+    await audio.loadSequence(result.events, result.bpm);
     resetPlayback();
     setGenerated(result);
     setErrors([]);
+    return result;
   } catch (error) {
     console.error(error);
     const message = error instanceof Error ? error.message : 'No se pudo generar el montuno.';
     setErrors([message]);
     setGenerated(undefined);
+    return undefined;
   }
 }
 

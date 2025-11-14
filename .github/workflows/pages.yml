@@ -36,9 +36,29 @@ jobs:
       - name: Install dependencies
         run: npm install
         working-directory: frontend
+      - name: Run unit tests
+        run: npm run test
+        working-directory: frontend
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Run end-to-end tests
+        run: npm run test:e2e
+        working-directory: frontend
+        env:
+          CI: true
       - name: Build static site
         run: npm run build:pages
         working-directory: frontend
+      - name: Package desktop app
+        run: |
+          mkdir -p dist
+          python -m zipfile -c dist/montuno-desktop.zip desktop_app
+      - name: Upload desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: montuno-desktop
+          path: dist/montuno-desktop.zip
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v2
         with:
