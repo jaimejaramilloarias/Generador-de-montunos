@@ -1,11 +1,15 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 
-const repoBase = process.env.GITHUB_REPOSITORY?.split('/')?.[1];
+const DEFAULT_REPO_BASE = 'Generador-de-montunos';
 
-export default defineConfig(() => ({
+export default defineConfig(({ command }) => {
+  const envBase = process.env.GHPAGES_BASE ?? process.env.PUBLIC_URL;
+  const base = command === 'serve' ? '/' : envBase ?? `/${DEFAULT_REPO_BASE}/`;
+
+  return {
   root: resolve(__dirname, '.'),
-  base: process.env.GHPAGES_BASE ?? (repoBase ? `/${repoBase}/` : '/'),
+  base,
   build: {
     outDir: resolve(__dirname, '../docs'),
     emptyOutDir: true,
@@ -39,4 +43,5 @@ export default defineConfig(() => ({
     environment: 'jsdom',
     restoreMocks: true,
   },
-}));
+  };
+});
