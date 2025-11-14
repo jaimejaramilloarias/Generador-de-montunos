@@ -1,0 +1,22 @@
+# Python artefacts
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+.venv/
+.env
+
+# Node artefacts
+node_modules/
+*.log
+
+# Build outputs
+frontend/dist/
+docs/*
+!docs/.gitkeep
+
+# Editor settings
+.vscode/
+.idea/
+.DS_Store

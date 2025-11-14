@@ -8,11 +8,9 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pretty_midi
 
-import midi_utils
-import midi_utils_tradicional
-from modos import MODOS_DISPONIBLES
-import salsa
-from utils import apply_manual_edits, limpiar_inversion
+from .. import midi_utils, midi_utils_tradicional, salsa
+from ..modos import MODOS_DISPONIBLES
+from ..utils import apply_manual_edits, limpiar_inversion
 
 from .config import ClaveConfig, get_clave_tag
 

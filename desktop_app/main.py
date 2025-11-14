@@ -39,18 +39,17 @@ import pretty_midi
 import pygame.midi
 from typing import Dict, List, Optional, Tuple, Set
 
-from autocomplete import ChordAutocomplete
+from .autocomplete import ChordAutocomplete
 
-import salsa
-import style_utils
-from utils import (
+from backend import salsa, style_utils
+from backend.utils import (
     limpiar_inversion,
     calc_default_inversions,
     normalise_bars,
     RE_BAR_CLEAN,
     clean_tokens,
 )
-from ui_config import (
+from .ui_config import (
     COLORS,
     get_entry_font,
     get_general_font,
@@ -59,11 +58,14 @@ from ui_config import (
     save_preferences,
 )
 
-from montuno_core import CLAVES, generate_montuno, get_clave_tag
-from modos import MODOS_DISPONIBLES
+from backend.montuno_core import CLAVES, generate_montuno, get_clave_tag
+from backend.modos import MODOS_DISPONIBLES
 
 # Base directory of the project to build absolute paths to resources.
 BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent
+BACKEND_DIR = PROJECT_ROOT / "backend"
+REFERENCE_ROOT = BACKEND_DIR / "reference_midi_loops"
 
 # Short labels for drop down menus
 ARMONIZACION_LABELS = {
@@ -343,7 +345,7 @@ def generar(
             armonizacion_default=armonizacion_default,
             variacion=variacion,
             inversion=inversion,
-            reference_root=BASE_DIR / "reference_midi_loops",
+            reference_root=REFERENCE_ROOT,
             inversiones_por_indice=inversiones_custom,
             manual_edits=manual_edits,
             seed=seed,
@@ -492,9 +494,9 @@ def main():
             sufijo = sufijos[idx]
             clave_tag = get_clave_tag(cfg)
             inversion = limpiar_inversion(inversion_var.get())
-            path = str(BASE_DIR / "reference_midi_loops" / f"salsa_{clave_tag}_{inversion}_{sufijo}.mid")
+            path = str(REFERENCE_ROOT / f"salsa_{clave_tag}_{inversion}_{sufijo}.mid")
         else:
-            path = str(BASE_DIR / "reference_midi_loops" / f"{cfg.midi_prefix}_{variacion}.mid")
+            path = str(REFERENCE_ROOT / f"{cfg.midi_prefix}_{variacion}.mid")
 
         midi_var.set(path)
         actualizar_visualizacion(force_new_seed=True)
