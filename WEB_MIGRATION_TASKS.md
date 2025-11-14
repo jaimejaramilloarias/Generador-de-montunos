@@ -57,6 +57,7 @@ La interfaz de escritorio ahora invoca únicamente `generate_montuno`, suministr
 - [x] Configurar pruebas E2E en el frontend (Playwright/Cypress) para validar flujos críticos. 【F:frontend/playwright.config.ts†L1-L23】【F:frontend/tests/e2e/app.spec.ts†L1-L23】【F:frontend/package.json†L8-L15】
 - [x] Optimizar el tamaño del bundle y habilitar carga diferida de módulos pesados. 【F:frontend/src/ui/app.ts†L1-L129】【F:frontend/src/audio/player.ts†L1-L79】【F:frontend/vite.config.ts†L1-L26】
 - [x] Configurar CI/CD para construir y publicar automáticamente en GitHub Pages. 【F:.github/workflows/pages.yml†L1-L54】【F:README.md†L33-L48】
+- [x] Incorporar pruebas de regresión musical para asegurar consistencia en los eventos generados. 【F:frontend/src/music/generator.test.ts†L1-L207】
 
 ## Fase 7 · Migración progresiva
 - [x] Implementar despliegue paralelo (escritorio y web) hasta que la versión web alcance paridad total de funciones. 【F:planning/parallel-deployment.md†L1-L27】【F:.github/workflows/pages.yml†L1-L54】
@@ -66,5 +67,5 @@ La interfaz de escritorio ahora invoca únicamente `generate_montuno`, suministr
 ## Consideraciones adicionales
 - Evaluar licencias y compatibilidad de las nuevas dependencias web.
 - Mantener la lógica musical intacta, verificando que los resultados generados coincidan con la versión de escritorio.
-- Incluir pruebas de regresión musical (comparación de salidas MIDI) para garantizar consistencia.
+- Incluir pruebas de regresión musical (comparación de salidas MIDI) para garantizar consistencia. ✓ Cubierto en la Fase 6 con las pruebas snapshot. 【F:frontend/src/music/generator.test.ts†L1-L207】
 
