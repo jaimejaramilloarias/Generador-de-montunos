@@ -4,7 +4,7 @@ const progression = 'Cm7 F7 | Bb7 Eb7';
 
 test.describe('Generador de Montunos - flujo principal', () => {
   test('permite generar y preparar un montuno para descarga', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('./');
 
     await expect(page.getByRole('heading', { name: 'Generador de Montunos' })).toBeVisible();
 
