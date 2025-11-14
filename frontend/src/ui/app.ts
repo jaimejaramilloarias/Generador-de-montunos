@@ -1,6 +1,9 @@
 import {
   getState,
+  deleteSavedProgression,
+  loadSavedProgression,
   resetPlayback,
+  saveCurrentProgression,
   setBpm,
   setChord,
   setClave,
@@ -41,6 +44,9 @@ interface UiRefs {
   errorList: HTMLDivElement;
   chordsTable: HTMLTableSectionElement;
   summary: HTMLDivElement;
+  saveNameInput: HTMLInputElement;
+  saveButton: HTMLButtonElement;
+  savedList: HTMLUListElement;
 }
 
 function getGeneratorModule(): Promise<GeneratorModule> {
@@ -71,6 +77,8 @@ function scheduleModulePrefetch(): void {
     void getMidiModule();
   }, 250);
 }
+
+let lastActiveProgressionId: string | null = null;
 
 export function setupApp(root: HTMLElement): void {
   root.innerHTML = buildLayout();
@@ -154,6 +162,20 @@ function buildLayout(): string {
               </table>
             </div>
           </section>
+          <section class="panel__section">
+            <header class="panel__section-header">
+              <h2>Progresiones guardadas</h2>
+              <p>Conserva tus progresiones favoritas para reutilizarlas en el futuro.</p>
+            </header>
+            <div class="saved-controls">
+              <label class="input-group saved-controls__input">
+                <span>Nombre</span>
+                <input id="saved-name" type="text" placeholder="Intro en C mayor" autocomplete="off" />
+              </label>
+              <button type="button" id="save-progression" class="btn">Guardar progresión</button>
+            </div>
+            <ul id="saved-progressions" class="saved-list" aria-live="polite"></ul>
+          </section>
           <section class="panel__section panel__section--actions">
             <div class="actions">
               <button type="submit" id="generate" class="btn btn--primary">Generar montuno</button>
@@ -190,6 +212,9 @@ function grabRefs(root: HTMLElement): UiRefs {
     errorList: root.querySelector<HTMLDivElement>('#errors')!,
     chordsTable: root.querySelector<HTMLTableSectionElement>('#chords')!,
     summary: root.querySelector<HTMLDivElement>('#summary-content')!,
+    saveNameInput: root.querySelector<HTMLInputElement>('#saved-name')!,
+    saveButton: root.querySelector<HTMLButtonElement>('#save-progression')!,
+    savedList: root.querySelector<HTMLUListElement>('#saved-progressions')!,
   };
 }
 
@@ -299,6 +324,17 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 2000);
   });
+
+  refs.saveButton.addEventListener('click', () => {
+    saveCurrentProgression(refs.saveNameInput.value);
+  });
+
+  refs.saveNameInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      refs.saveButton.click();
+    }
+  });
 }
 
 async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefined> {
@@ -350,11 +386,25 @@ function updateUi(state: AppState, refs: UiRefs): void {
   renderChordRows(state, refs.chordsTable);
   renderErrors(state.errors, refs);
   renderSummary(state, refs.summary);
+  renderSavedProgressions(state, refs);
 
   refs.generateBtn.disabled = state.progressionInput.trim().length === 0 || state.errors.length > 0;
   refs.playBtn.disabled = !state.generated && (state.progressionInput.trim().length === 0 || state.errors.length > 0);
   refs.playBtn.textContent = state.isPlaying ? 'Detener' : 'Reproducir';
   refs.downloadBtn.disabled = !state.generated;
+  refs.saveButton.disabled = state.progressionInput.trim().length === 0 || state.errors.length > 0;
+  refs.saveButton.textContent = state.activeProgressionId ? 'Actualizar progresión' : 'Guardar progresión';
+
+  if (state.activeProgressionId !== lastActiveProgressionId && document.activeElement !== refs.saveNameInput) {
+    const active = state.savedProgressions.find((item) => item.id === state.activeProgressionId);
+    refs.saveNameInput.value = active ? active.name : '';
+  }
+  if (document.activeElement !== refs.saveNameInput) {
+    refs.saveNameInput.placeholder = state.activeProgressionId
+      ? 'Actualizar nombre de la progresión'
+      : 'Intro en C mayor';
+  }
+  lastActiveProgressionId = state.activeProgressionId;
 }
 
 function populateSelect(select: HTMLSelectElement, options: { value: string; label: string }[]): void {
@@ -447,4 +497,75 @@ function renderSummary(state: AppState, container: HTMLDivElement): void {
     <p><strong>Variación:</strong> ${state.variation}</p>
     <p><strong>Clave:</strong> ${state.clave}</p>
   `;
+}
+
+const savedDateFormatter = new Intl.DateTimeFormat('es', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+});
+
+function renderSavedProgressions(state: AppState, refs: UiRefs): void {
+  const list = refs.savedList;
+  list.innerHTML = '';
+
+  if (!state.savedProgressions.length) {
+    const emptyItem = document.createElement('li');
+    emptyItem.className = 'saved-list__empty';
+    emptyItem.textContent = 'Aún no hay progresiones guardadas.';
+    list.appendChild(emptyItem);
+    return;
+  }
+
+  state.savedProgressions.forEach((item) => {
+    const entry = document.createElement('li');
+    entry.className = 'saved-list__item';
+    if (state.activeProgressionId === item.id) {
+      entry.classList.add('saved-list__item--active');
+    }
+
+    const info = document.createElement('div');
+    info.className = 'saved-list__info';
+
+    const name = document.createElement('span');
+    name.className = 'saved-list__name';
+    name.textContent = item.name;
+
+    const preview = document.createElement('span');
+    preview.className = 'saved-list__preview';
+    preview.textContent = item.progression;
+
+    const timestamp = document.createElement('span');
+    timestamp.className = 'saved-list__timestamp';
+    const updatedAt = new Date(item.updatedAt);
+    if (!Number.isNaN(updatedAt.getTime())) {
+      timestamp.textContent = `Actualizado ${savedDateFormatter.format(updatedAt)}`;
+    } else {
+      timestamp.textContent = '';
+    }
+
+    info.append(name, preview, timestamp);
+
+    const actions = document.createElement('div');
+    actions.className = 'saved-list__actions';
+
+    const loadButton = document.createElement('button');
+    loadButton.type = 'button';
+    loadButton.className = 'saved-list__action';
+    loadButton.textContent = 'Cargar';
+    loadButton.addEventListener('click', () => {
+      loadSavedProgression(item.id);
+    });
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'saved-list__action saved-list__action--danger';
+    deleteButton.textContent = 'Eliminar';
+    deleteButton.addEventListener('click', () => {
+      deleteSavedProgression(item.id);
+    });
+
+    actions.append(loadButton, deleteButton);
+    entry.append(info, actions);
+    list.appendChild(entry);
+  });
 }

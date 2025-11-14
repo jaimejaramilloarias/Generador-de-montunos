@@ -19,6 +19,8 @@ describe('generateMontuno', () => {
     errors: [],
     isPlaying: false,
     generated: undefined,
+    savedProgressions: [],
+    activeProgressionId: null,
   };
 
   it('genera eventos a partir de la configuración', () => {
