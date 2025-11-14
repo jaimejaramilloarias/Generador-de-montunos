@@ -38,9 +38,22 @@ Ejecuta `npm run build:pages` dentro de `frontend/` para compilar la aplicación
 
 ## Pruebas
 
-La lógica de parsing y la generación musical cuentan con pruebas unitarias en `frontend/src/utils` y `frontend/src/music`. Puedes ejecutarlas con:
+La lógica de parsing y la generación musical cuentan con pruebas unitarias en `frontend/src/utils` y `frontend/src/music`.
+
+- `npm run test` ejecuta las pruebas unitarias en modo de una sola pasada (`vitest --run`).
+- `npm run test:watch` deja Vitest en modo interactivo durante el desarrollo.
+- `npm run test:e2e` levanta la build de producción y lanza las pruebas end-to-end con Playwright (requiere ejecutar una vez `npx playwright install --with-deps chromium`).
 
 ```bash
 cd frontend
-npm run test
+npm run test:ci
 ```
+
+El comando anterior ejecuta de forma secuencial las pruebas unitarias y las end-to-end.
+
+## Estrategia de despliegue paralelo
+
+- La aplicación web se publica automáticamente en GitHub Pages mediante el workflow `.github/workflows/pages.yml` después de ejecutar las pruebas unitarias y E2E.
+- La aplicación de escritorio se mantiene disponible en paralelo mediante paquetes comprimidos generados desde la carpeta `desktop_app/`. El proceso manual/automatizado se documenta en `planning/parallel-deployment.md` y permite publicar ambas variantes en cada lanzamiento.
+
+Consulta también `planning/desktop-phaseout.md` para la hoja de ruta de retirada gradual de la versión de escritorio cuando la web alcance paridad funcional.
