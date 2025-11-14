@@ -2,7 +2,6 @@
 """Simple GUI for montuno generation."""
 
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from tkinter import PhotoImage
 from tkinter import colorchooser
 import tkinter.font as tkfont
@@ -42,13 +41,10 @@ from typing import Dict, List, Optional, Tuple, Set
 
 from autocomplete import ChordAutocomplete
 
-import midi_utils
-import midi_utils_tradicional
 import salsa
 import style_utils
 from utils import (
     limpiar_inversion,
-    apply_manual_edits,
     calc_default_inversions,
     normalise_bars,
     RE_BAR_CLEAN,
@@ -63,6 +59,7 @@ from ui_config import (
     save_preferences,
 )
 
+from montuno_core import CLAVES, generate_montuno, get_clave_tag
 from modos import MODOS_DISPONIBLES
 
 # Base directory of the project to build absolute paths to resources.
@@ -198,24 +195,6 @@ def _apply_styles(base_text: str) -> str:
     return style_utils.apply_styles(base_text)
 
 # ---------------------------------------------------------------------------
-# Configuration of the available "claves".  Each entry defines the reference
-# MIDI file and the rhythmic pattern to use.  Add new claves here in the
-# future, following the same structure.
-# ---------------------------------------------------------------------------
-CLAVES = {
-    "Clave 2-3": {
-        "midi_prefix": "tradicional_2-3",
-        "primer_bloque": [3, 4, 4, 3],
-        "patron_repetido": [5, 4, 4, 3],
-    },
-    "Clave 3-2": {
-        "midi_prefix": "tradicional_3-2",
-        "primer_bloque": [3, 3, 5, 4],
-        "patron_repetido": [4, 3, 5, 4],
-    },
-}
-
-# ---------------------------------------------------------------------------
 # Global counter for the generated montunos so output files have
 # sequential names.
 # ---------------------------------------------------------------------------
@@ -335,233 +314,63 @@ def generar(
     seed: Optional[int] = None,
     bpm: Optional[float] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
-    if seed is not None:
-        import random
-        old_state = random.getstate()
-        random.seed(seed)
-    else:
-        old_state = None
     clave = clave_var.get()
     cfg = CLAVES.get(clave)
     if cfg is None:
         status_var.set(f"Clave no soportada: {clave}")
-        return
-
-    # Apply the rhythmic pattern for the selected clave
-    modo_nombre = MODOS_INV.get(modo_combo.get(), modo_combo.get())
-
-    for mod in (midi_utils_tradicional, midi_utils):
-        mod.PRIMER_BLOQUE = cfg["primer_bloque"]
-        mod.PATRON_REPETIDO = cfg["patron_repetido"]
-        mod.PATRON_GRUPOS = mod.PRIMER_BLOQUE + mod.PATRON_REPETIDO * 3
-
-    global CONTADOR_MONTUNO
-    variacion = variacion_var.get()
-    inversion = limpiar_inversion(inversion_var.get())
+        return None
 
     progresion_texto = override_text if override_text is not None else texto.get("1.0", "end")
-    progresion_texto = " ".join(progresion_texto.split())  # limpia espacios extra
-    if not progresion_texto.strip():
+    progresion_texto = " ".join(progresion_texto.split())
+    if not progresion_texto:
         status_var.set("Ingresa una progresión de acordes")
-        return
+        return None
+
+    modo_nombre = MODOS_INV.get(modo_combo.get(), modo_combo.get())
+    armonizacion_default = ARMONIZACION_INV.get(armon_combo.get(), armon_combo.get())
+    variacion = variacion_var.get()
+    inversion = limpiar_inversion(inversion_var.get())
+    armonias_seq = armonias_custom if armonias_custom is not None else list(chord_armos)
+    bpm_val = bpm if bpm is not None else 120.0
 
     try:
-        asignaciones_all, _ = salsa.procesar_progresion_salsa(progresion_texto)
-    except Exception as e:
-        status_var.set(str(e))
-        return
+        resultado = generate_montuno(
+            progresion_texto,
+            clave_config=cfg,
+            modo_default=modo_nombre,
+            modo_por_acorde=list(chord_styles),
+            armonias_por_indice=armonias_seq,
+            armonizacion_default=armonizacion_default,
+            variacion=variacion,
+            inversion=inversion,
+            reference_root=BASE_DIR / "reference_midi_loops",
+            inversiones_por_indice=inversiones_custom,
+            manual_edits=manual_edits,
+            seed=seed,
+            bpm=bpm_val,
+            return_pm=return_pm,
+        )
+    except Exception as exc:
+        status_var.set(str(exc))
+        return None
 
-    num_acordes = len(asignaciones_all)
-    estilos_loc = list(chord_styles)
-    if len(estilos_loc) < num_acordes:
-        estilos_loc.extend([modo_nombre] * (num_acordes - len(estilos_loc)))
-    elif len(estilos_loc) > num_acordes:
-        estilos_loc = estilos_loc[:num_acordes]
-
-    if not asignaciones_all:
-        status_var.set("Progresión vacía")
-        return
-
-    segmentos_info: List[Tuple[str, int, int]] = []
-    start = 0
-    modo_actual = estilos_loc[0]
-    for i in range(1, num_acordes):
-        if estilos_loc[i] != modo_actual:
-            segmentos_info.append((modo_actual, start, i))
-            start = i
-            modo_actual = estilos_loc[i]
-    segmentos_info.append((modo_actual, start, num_acordes))
-
-    segmentos: List[Tuple[str, List[Tuple], int, List[int]]] = []
-    for modo, a, b in segmentos_info:
-        asign_abs = asignaciones_all[a:b]
-        start_cor = asign_abs[0][1][0]
-        rel = [
-            (n, [i - start_cor for i in idxs], arm, inv)
-            for n, idxs, arm, inv in asign_abs
-        ]
-        segmentos.append((modo, rel, start_cor, list(range(a, b))))
-
-    modo_tag = (
-        "salsa"
-        if len({m for m, _, _, _ in segmentos}) == 1 and segmentos[0][0] == "Salsa"
-        else "tradicional"
-        if len({m for m, _, _, _ in segmentos}) == 1 and segmentos[0][0] == "Tradicional"
-        else "mixto"
-    )
-    clave_tag = cfg["midi_prefix"].split("_")[1]
+    global CONTADOR_MONTUNO
     output_dir = Path.home() / "Desktop" / "montunos"
     output_dir.mkdir(parents=True, exist_ok=True)
     if output_path is None:
-        output = output_dir / f"{modo_tag}_{clave_tag}_{CONTADOR_MONTUNO}.mid"
+        output = output_dir / f"{resultado.modo_tag}_{resultado.clave_tag}_{CONTADOR_MONTUNO}.mid"
         CONTADOR_MONTUNO += 1
     else:
         output = Path(output_path)
 
-    import pretty_midi
-
-    notas_finales = []
-    cur_bpm = 120.0
-    inst_params = None
-    max_cor = 0
-
-    with TemporaryDirectory() as tmpdir:
-        inv_idx = 0
-        for idx, (modo_seg, asign_seg, start_cor, idxs_seg) in enumerate(segmentos):
-            funcion = MODOS_DISPONIBLES.get(modo_seg)
-            if funcion is None:
-                status_var.set(f"Modo no soportado: {modo_seg}")
-                return
-
-            if modo_seg == "Salsa":
-                sufijos = ['A', 'B', 'C', 'D']
-                idx = (seed or 0) % 4
-                sufijo = sufijos[idx]
-                clave_tag_m = cfg["midi_prefix"].split("_")[1]
-                inversion = limpiar_inversion(inversion_var.get())
-                midi_ref_seg = BASE_DIR / "reference_midi_loops" / f"salsa_{clave_tag_m}_{inversion}_{sufijo}.mid"
-                arg_extra = inversion
-
-            else:
-                midi_ref_seg = BASE_DIR / "reference_midi_loops" / f"{cfg['midi_prefix']}_{variacion}.mid"
-                arg_extra = ARMONIZACION_INV.get(armon_combo.get(), armon_combo.get())
-
-            if not midi_ref_seg.exists():
-                status_var.set(f"No se encontró {midi_ref_seg}")
-                return
-
-            tmp_path = Path(tmpdir) / f"seg{idx}.mid"
-            kwargs = {"asignaciones_custom": asign_seg}
-            if modo_seg == "Salsa":
-                if inversiones_custom is not None:
-                    inv_seg = inversiones_custom[inv_idx : inv_idx + len(asign_seg)]
-                    inv_idx += len(asign_seg)
-                    if inv_seg:
-                        kwargs["inversiones_manual"] = inv_seg
-            else:
-                if inversiones_custom is not None:
-                    inv_seg = inversiones_custom[inv_idx : inv_idx + len(asign_seg)]
-                    inv_idx += len(asign_seg)
-                    if inv_seg:
-                        suf_map = {"root": "1", "third": "3", "fifth": "5", "seventh": "7"}
-                        asign_mod = []
-                        for (nombre, idxs, arm, *rest), inv in zip(asign_seg, inv_seg):
-                            if inv and inv != "root":
-                                nombre = f"{nombre}/{suf_map.get(inv, '1')}"
-                            asign_mod.append((nombre, idxs, arm))
-                        asign_seg = asign_mod
-                        kwargs["asignaciones_custom"] = asign_seg
-                if armonias_custom is not None:
-                    armon_seg = [armonias_custom[i] for i in idxs_seg]
-                else:
-                    armon_seg = [chord_armos[i] for i in idxs_seg]
-                kwargs["armonizaciones_custom"] = armon_seg
-                kwargs["aleatorio"] = True
-            try:
-                funcion(
-                    "",
-                    midi_ref_seg,
-                    tmp_path,
-                    arg_extra,
-                    inicio_cor=start_cor,
-                    return_pm=False,
-                    **kwargs,
-                )
-            except Exception as e:
-                status_var.set(str(e))
-                return
-
-            pm = pretty_midi.PrettyMIDI(str(tmp_path))
-            seg_bpm = 120.0
-            inst = pm.instruments[0]
-            if inst_params is None:
-                inst_params = (inst.program, inst.is_drum, inst.name)
-
-            escala = 1.0
-            grid_seg = 60.0 / seg_bpm / 2
-            seg_cor = int(round(pm.get_end_time() / grid_seg))
-            start = start_cor * (60.0 / cur_bpm / 2)
-            for n in pm.instruments[0].notes:
-                if n.pitch in (0, 21):
-                    continue
-                notas_finales.append(
-                    pretty_midi.Note(
-                        velocity=n.velocity,
-                        pitch=n.pitch,
-                        start=n.start * escala + start,
-                        end=n.end * escala + start,
-                    )
-                )
-            if start_cor + seg_cor > max_cor:
-                max_cor = start_cor + seg_cor
-
-    grid = 60.0 / cur_bpm / 2
-    final_offset = max_cor * grid
-    if final_offset > 0 and not return_pm:
-        has_start = any(n.start <= 0 < n.end and n.pitch > 0 for n in notas_finales)
-        has_end = any(
-            n.pitch > 0 and n.start < final_offset and n.end > final_offset - grid for n in notas_finales
-        )
-        if not has_start:
-            notas_finales.append(
-                pretty_midi.Note(
-                    velocity=1,
-                    pitch=0,
-                    start=0.0,
-                    end=min(grid, final_offset),
-                )
-            )
-        if not has_end:
-            notas_finales.append(
-                pretty_midi.Note(
-                    velocity=1,
-                    pitch=0,
-                    start=max(0.0, final_offset - grid),
-                    end=final_offset,
-                )
-            )
-
-    pm_out = pretty_midi.PrettyMIDI()
-    inst_out = pretty_midi.Instrument(
-        program=inst_params[0], is_drum=inst_params[1], name=inst_params[2]
-    )
-    inst_out.notes = notas_finales
-    pm_out.instruments.append(inst_out)
-    if manual_edits:
-        apply_manual_edits(pm_out, manual_edits)
     if return_pm:
-        if old_state is not None:
-            import random
-            random.setstate(old_state)
-        return pm_out
+        return resultado.midi
+
     try:
-        pm_out.write(str(output))
+        resultado.midi.write(str(output))
         status_var.set(f"MIDI generado: {output}")
-    except Exception as e:
-        status_var.set(f"Error: {e}")
-    if old_state is not None:
-        import random
-        random.setstate(old_state)
+    except Exception as exc:
+        status_var.set(f"Error: {exc}")
     return None
 
 
@@ -671,7 +480,9 @@ def main():
 
     def actualizar_midi() -> None:
         """Update the reference MIDI label according to the selected mode."""
-        cfg = CLAVES[clave_var.get()]
+        cfg = CLAVES.get(clave_var.get())
+        if cfg is None:
+            return
         variacion = variacion_var.get()
         modo = MODOS_INV.get(modo_combo.get(), modo_combo.get())
         if modo == "Salsa":
@@ -679,11 +490,11 @@ def main():
             import random
             idx = random.randint(0, 3)  # O usa tu lógica de seed si la tienes
             sufijo = sufijos[idx]
-            clave_tag = cfg["midi_prefix"].split("_")[1]
+            clave_tag = get_clave_tag(cfg)
             inversion = limpiar_inversion(inversion_var.get())
             path = str(BASE_DIR / "reference_midi_loops" / f"salsa_{clave_tag}_{inversion}_{sufijo}.mid")
         else:
-            path = str(BASE_DIR / "reference_midi_loops" / f"{cfg['midi_prefix']}_{variacion}.mid")
+            path = str(BASE_DIR / "reference_midi_loops" / f"{cfg.midi_prefix}_{variacion}.mid")
 
         midi_var.set(path)
         actualizar_visualizacion(force_new_seed=True)
