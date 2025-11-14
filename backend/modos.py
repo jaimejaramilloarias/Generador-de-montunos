@@ -7,12 +7,12 @@ import pretty_midi
 from typing import List, Optional, Tuple
 
 
-from voicings_tradicional import generar_voicings_enlazados_tradicional
-from midi_utils_tradicional import (
+from .voicings_tradicional import generar_voicings_enlazados_tradicional
+from .midi_utils_tradicional import (
     exportar_montuno,
     procesar_progresion_en_grupos,
 )
-from salsa import montuno_salsa
+from .salsa import montuno_salsa
 
 
 # ==========================================================================

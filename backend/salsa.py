@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Optional
 import pretty_midi
 
-from voicings import parsear_nombre_acorde, INTERVALOS_TRADICIONALES
-from midi_utils import (
+from .voicings import parsear_nombre_acorde, INTERVALOS_TRADICIONALES
+from .midi_utils import (
     _grid_and_bpm,
     procesar_progresion_en_grupos,
     _cortar_notas_superpuestas,

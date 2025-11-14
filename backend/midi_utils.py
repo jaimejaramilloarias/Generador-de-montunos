@@ -7,8 +7,8 @@ import math
 import pretty_midi
 import random
 import logging
-from voicings_tradicional import parsear_nombre_acorde, INTERVALOS_TRADICIONALES
-from midi_common import (
+from .voicings import parsear_nombre_acorde, INTERVALOS_TRADICIONALES
+from .midi_common import (
     NOTAS_BASE,
     leer_midi_referencia,
     obtener_posiciones_referencia,
@@ -16,7 +16,14 @@ from midi_common import (
     construir_posiciones_por_ventanas,
 )
 
+# All reference MIDI loops have the same length (32 bars with 8 eighth-notes
+# each). Tempo information is ignored so the default player tempo is used.
+NORMALIZED_BPM = 200.0  # Unused but kept for compatibility
+
+
 logger = logging.getLogger(__name__)
+
+
 
 # ==========================================================================
 # MIDI export utilities
@@ -264,6 +271,7 @@ def _arm_decimas_intervalos(
         is_sixth = datos["is_sixth"]
         is_dim7 = datos["is_dim7"]
         suf = datos["suf"]
+        suf = datos["suf"]
 
         # --------------------------------------------------------------
         # Identify the function of ``base`` comparing its pitch class
@@ -291,11 +299,7 @@ def _arm_decimas_intervalos(
                 target_int = ints[0]
             else:
                 func = "7"
-                # For chords with b9 the minor seventh always pairs
-                # with the flat nine instead of the major nine.
-                if suf == "m7(b5)":
-                    target_int = 13
-                elif suf in ("7(b9)", "+7(b9)", "7(b5)b9", "7sus4(b9)"):
+                if suf in ("7(b9)", "+7(b9)", "7(b5)b9", "7sus4(b9)"):
                     target_int = ints[4]
                 else:
                     target_int = 2
@@ -310,8 +314,8 @@ def _arm_decimas_intervalos(
         # note is placed exactly ``diff`` semitones above ``base``.
         # --------------------------------------------------------------
         diff = (target_int - base_int) + (24 if func in ("6", "7") else 12)
-        # If the added note is a flat nine, force a minor tenth (15 semitones)
-        # above the principal voice even if this exceeds the usual range.
+        # If the added note is the flat nine, force a minor tenth (15 semitones)
+        # above the principal voice even if it exceeds the usual range.
         if func == "7" and target_int == 13:
             diff = (target_int - base_int) + 12
         agregada = base + diff
@@ -379,9 +383,6 @@ def _arm_treceavas_intervalos(
         )
 
     contadores: Dict[int, int] = {}
-    offsets: Dict[int, int] = {}
-    bajo_anterior: Optional[int] = None
-    arm_anterior: Optional[str] = None
     resultado: List[pretty_midi.Note] = []
 
     for pos in posiciones:
@@ -425,11 +426,7 @@ def _arm_treceavas_intervalos(
                 target_int = ints[0]
             else:
                 func = "7"
-                # En acordes con b9 la séptima menor se empareja
-                # siempre con la novena bemol.
-                if suf == "m7(b5)":
-                    target_int = 13
-                elif suf in ("7(b9)", "+7(b9)", "7(b5)b9", "7sus4(b9)"):
+                if suf in ("7(b9)", "+7(b9)", "7(b5)b9", "7sus4(b9)"):
                     target_int = ints[4]
                 else:
                     target_int = 2
@@ -438,7 +435,7 @@ def _arm_treceavas_intervalos(
             target_int = pc
 
         diff = (target_int - base_int) + (24 if func in ("6", "7") else 12)
-        # Si la nota agregada es la novena menor, se fuerza una décima menor
+        # Si la nota agregada es la novena menor, se fuerza una «décima menor»
         # (15 semitonos) por encima de la voz principal aunque se supere el
         # registro habitual.
         if func == "7" and target_int == 13:
@@ -582,10 +579,7 @@ def generar_notas_mixtas(
                     target_int = ints[0]
                     func = "6"
                 else:
-                    # En acordes con b9 la séptima menor se asocia a la b9
-                    if suf == "m7(b5)":
-                        target_int = 13
-                    elif suf in ("7(b9)", "+7(b9)", "7(b5)b9", "7sus4(b9)"):
+                    if suf in ("7(b9)", "+7(b9)", "7(b5)b9", "7sus4(b9)"):
                         target_int = ints[4]
                     else:
                         target_int = 2
@@ -668,15 +662,27 @@ def aplicar_armonizacion(
 def _grid_and_bpm(pm: pretty_midi.PrettyMIDI) -> Tuple[int, float, float]:
     """Return the reference length, eighth duration and BPM.
 
-    All reference templates span exactly 32 bars (``256`` eighth-notes).  Tempo
-    information is ignored and ``120`` BPM is assumed to ensure every template
-    aligns to the same grid regardless of its internal timing.
+    The project assumes all reference templates span exactly 32 bars
+    (``256`` eighth-notes).  Tempo data in the files is ignored and a
+    constant tempo of ``120`` BPM is used for every template so the
+    resulting grid is always identical.
     """
 
     bpm = 120.0
-    grid = 60.0 / bpm / 2
+    grid = 60.0 / bpm / 2  # seconds per eighth note
     cor = 256
     return cor, grid, bpm
+
+
+def normalize_tempo(pm: pretty_midi.PrettyMIDI, target_bpm: float = NORMALIZED_BPM) -> pretty_midi.PrettyMIDI:
+    """Return ``pm`` unchanged.
+
+    Tempo normalization has been disabled because all templates already lack
+    tempo messages.  The caller may still invoke this function for
+    compatibility, but no processing is performed.
+    """
+
+    return pm
 
 
 def _recortar_notas_a_limite(
@@ -730,16 +736,15 @@ def exportar_montuno(
     *,
     inicio_cor: int = 0,
     debug: bool = False,
-    return_pm: bool = False,
     aleatorio: bool = False,
-) -> Optional[pretty_midi.PrettyMIDI]:
+) -> None:
     """Generate a new MIDI file with the given voicings.
 
     The resulting notes are trimmed so the output stops after the last
-    eighth-note of the progression. ``inicio_cor`` is the absolute
-    eighth-note index where this segment starts and is used to align the
-    reference material accordingly. ``armonizacion`` specifies how notes
-    should be duplicated (for example, in octaves).
+    eighth-note of the progression. ``inicio_cor`` is the global eighth-note
+    index where this segment begins and is used to align the reference
+    template so all segments stay perfectly in sync. ``armonizacion``
+    specifies how notes should be duplicated (for example, in octaves).
     """
     notes, pm = leer_midi_referencia(midi_referencia_path)
     posiciones_base = obtener_posiciones_referencia(notes)
@@ -756,10 +761,11 @@ def exportar_montuno(
         total_dest_cor = num_compases * 8
     limite_cor = total_dest_cor
     # --------------------------------------------------------------
-    # Align the reference with the absolute eighth-note offset of this
-    # segment so mode switches never break the continuity.  ``inicio_cor``
-    # marks the global position where the segment begins; we map it
-    # modulo the reference length to determine the starting point.
+    # The reference must align with the absolute eighth-note position of
+    # the progression so changes of mode or template never break the
+    # continuity. ``inicio_cor`` indicates the global index where this
+    # segment starts; use it modulo the reference length to pick the
+    # correct starting point.
     # --------------------------------------------------------------
     inicio_ref = inicio_cor % total_cor_ref
     if aleatorio:
@@ -832,9 +838,6 @@ def exportar_montuno(
     )
     inst_out.notes = nuevas_notas
     pm_out.instruments.append(inst_out)
-    if return_pm:
-        return pm_out
-
     pm_out.write(str(output_path))
 
 
@@ -871,6 +874,8 @@ def _siguiente_grupo(indice: int) -> int:
 
 
 def _indice_para_corchea(cor: int) -> int:
+    """Return the pattern index corresponding to ``cor`` eighth-notes."""
+
     idx = 0
     pos = 0
     while pos < cor:
@@ -885,12 +890,11 @@ def procesar_progresion_en_grupos(
     *,
     inicio_cor: int = 0,
 ) -> Tuple[List[Tuple[str, List[int], str]], int]:
-    """Asignar corcheas a los acordes por compases.
+    """Asignar corcheas por compases según las barras ``|``.
 
-    Cada segmento delimitado por ``|`` puede contener uno o dos acordes. Si
-    hay un solo acorde se asignan dos grupos consecutivos de corcheas; con dos
-    acordes, cada uno recibe un grupo. Más de dos acordes en un mismo segmento
-    provoca un ``ValueError``.
+    Un segmento con un solo acorde ocupa dos grupos consecutivos de corcheas.
+    Si contiene dos acordes cada uno recibe un grupo. Cualquier segmento con
+    más de dos acordes genera un ``ValueError``.
     """
 
     import re

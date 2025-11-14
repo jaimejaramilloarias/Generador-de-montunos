@@ -12,28 +12,31 @@ Este documento describe las tareas necesarias para convertir el generador de mon
 
 | Módulo Python | Uso actual | Alternativa web propuesta |
 | ------------- | ---------- | ------------------------- |
-| `tkinter` / `customtkinter` | Renderizado de la interfaz de escritorio. 【F:main.py†L4-L27】 | Framework de componentes (React, Svelte) o Web Components con estilos CSS nativos. |
-| `pygame.midi` | Descubrimiento y envío de mensajes MIDI a puertos locales. 【F:main.py†L34-L41】【F:main.py†L596-L670】 | Web MIDI API (`navigator.requestMIDIAccess`) con utilidades como `webmidi`. |
-| `mido` | Utilidades MIDI en el backend actual (lectura/escritura). 【F:main.py†L34-L41】 | Librerías JS como `tone.js` o `midiconvert` para generación y exportación de archivos `.mid`. |
-| `pretty_midi` | Ensamblado de pistas e instrumentos, manipulación de notas. 【F:montuno_core/generation.py†L1-L221】 | Uso de `tone.js`/`scribbletune` para síntesis y exportación, o portar la biblioteca vía Pyodide. |
-| Utilidades locales (`midi_utils`, `salsa`, `voicings_*`) | Cálculo de voicings, parsing y exportación MIDI. 【F:montuno_core/generation.py†L1-L221】 | Mantener la lógica en Pyodide o transpilar las partes críticas a TypeScript para ejecutarse en el navegador. |
+| `tkinter` / `customtkinter` | Renderizado de la interfaz de escritorio. 【F:desktop_app/main.py†L1-L60】 | Framework de componentes (React, Svelte) o Web Components con estilos CSS nativos. |
+| `pygame.midi` | Descubrimiento y envío de mensajes MIDI a puertos locales. 【F:desktop_app/main.py†L62-L150】【F:desktop_app/main.py†L574-L648】 | Web MIDI API (`navigator.requestMIDIAccess`) con utilidades como `webmidi`. |
+| `mido` | Utilidades MIDI en el backend actual (lectura/escritura). 【F:desktop_app/main.py†L62-L150】 | Librerías JS como `tone.js` o `midiconvert` para generación y exportación de archivos `.mid`. |
+| `pretty_midi` | Ensamblado de pistas e instrumentos, manipulación de notas. 【F:backend/montuno_core/generation.py†L1-L221】 | Uso de `tone.js`/`scribbletune` para síntesis y exportación, o portar la biblioteca vía Pyodide. |
+| Utilidades locales (`midi_utils`, `salsa`, `voicings_*`) | Cálculo de voicings, parsing y exportación MIDI. 【F:backend/montuno_core/generation.py†L1-L221】 | Mantener la lógica en Pyodide o transpilar las partes críticas a TypeScript para ejecutarse en el navegador. |
 
 ### Ejecución de la lógica central en el navegador
 
-La nueva capa `montuno_core` agrupa la lógica sin dependencias de GUI. Todo el flujo es Python puro que invoca `pretty_midi` y módulos propios; por tanto puede ejecutarse en Pyodide siempre que se empaqueten esas dependencias. Alternativamente, solo habría que portar `pretty_midi`/`mido` a WebAssembly o reimplementar la exportación MIDI en JavaScript si se busca reducir peso. Los algoritmos de enlace de acordes y de segmentación no dependen de extensiones nativas, por lo que son candidatos directos a ejecutarse en Pyodide. 【F:montuno_core/generation.py†L24-L221】
+La nueva capa `montuno_core` agrupa la lógica sin dependencias de GUI. Todo el flujo es Python puro que invoca `pretty_midi` y módulos propios; por tanto puede ejecutarse en Pyodide siempre que se empaqueten esas dependencias. Alternativamente, solo habría que portar `pretty_midi`/`mido` a WebAssembly o reimplementar la exportación MIDI en JavaScript si se busca reducir peso. Los algoritmos de enlace de acordes y de segmentación no dependen de extensiones nativas, por lo que son candidatos directos a ejecutarse en Pyodide. 【F:backend/montuno_core/generation.py†L24-L221】
 
 ### Extracción de la lógica de generación
 
-Se creó el paquete `montuno_core` con un punto de entrada `generate_montuno` que encapsula toda la generación y exportación de montunos, devolviendo un objeto `PrettyMIDI` junto con metadatos útiles para el front-end. Este módulo no importa `tkinter` ni objetos de GUI, por lo que puede reutilizarse desde un cliente web. 【F:montuno_core/__init__.py†L1-L11】【F:montuno_core/generation.py†L24-L221】
+Se creó el paquete `montuno_core` con un punto de entrada `generate_montuno` que encapsula toda la generación y exportación de montunos, devolviendo un objeto `PrettyMIDI` junto con metadatos útiles para el front-end. Este módulo no importa `tkinter` ni objetos de GUI, por lo que puede reutilizarse desde un cliente web. 【F:backend/montuno_core/__init__.py†L1-L11】【F:backend/montuno_core/generation.py†L24-L221】
 
 ### Puntos de interacción UI ↔ núcleo
 
-La interfaz de escritorio ahora invoca únicamente `generate_montuno`, suministrando textos, selecciones y rutas de salida, y recibe un `PrettyMIDI` listo para guardarse o previsualizarse. Las funciones de UI solo se encargan de leer controles, mostrar estados y escribir archivos, mientras que los cálculos musicales viven en `montuno_core`. Esto define una API clara para un futuro front-end web: basta con serializar los mismos parámetros hacia un worker Pyodide o un microservicio. 【F:main.py†L320-L381】【F:montuno_core/generation.py†L24-L221】
+La interfaz de escritorio ahora invoca únicamente `generate_montuno`, suministrando textos, selecciones y rutas de salida, y recibe un `PrettyMIDI` listo para guardarse o previsualizarse. Las funciones de UI solo se encargan de leer controles, mostrar estados y escribir archivos, mientras que los cálculos musicales viven en `montuno_core`. Esto define una API clara para un futuro front-end web: basta con serializar los mismos parámetros hacia un worker Pyodide o un microservicio. 【F:desktop_app/main.py†L300-L371】【F:backend/montuno_core/generation.py†L24-L221】
 
 ## Fase 2 · Reorganización del proyecto
-- [ ] Reestructurar el repositorio para separar `frontend/` (estáticos web) y `backend/` (lógica/motores). Asegurarse de que la lógica se exporte como un paquete reutilizable (por ejemplo, `montuno_core`).
-- [ ] Crear un sistema de construcción (p. ej. Vite, Astro o Next.js) que pueda desplegarse en GitHub Pages sin servidor.
-- [ ] Configurar automatización para empaquetar los recursos estáticos (scripts, estilos, assets) dentro de `docs/` o la carpeta esperada por GitHub Pages.
+- [x] Reestructurar el repositorio para separar `frontend/` (estáticos web) y `backend/` (lógica/motores). Asegurarse de que la lógica se exporte como un paquete reutilizable (por ejemplo, `montuno_core`).
+  - El código Python se movió a `backend/` con un paquete reutilizable y la interfaz clásica quedó en `desktop_app/`. 【F:backend/__init__.py†L1-L17】【F:desktop_app/main.py†L1-L88】
+- [x] Crear un sistema de construcción (p. ej. Vite, Astro o Next.js) que pueda desplegarse en GitHub Pages sin servidor.
+  - Se añadió un proyecto Vite + TypeScript listo para desarrollo y publicación. 【F:frontend/package.json†L1-L15】【F:frontend/src/main.ts†L1-L26】
+- [x] Configurar automatización para empaquetar los recursos estáticos (scripts, estilos, assets) dentro de `docs/` o la carpeta esperada por GitHub Pages.
+  - El build exporta a `docs/` y se automatizó el despliegue con GitHub Pages. 【F:frontend/vite.config.ts†L1-L18】【F:.github/workflows/pages.yml†L1-L46】
 
 ## Fase 3 · Interfaz web
 - [ ] Diseñar una UI web equivalente usando frameworks ligeros (Svelte, React, Vue o Vanilla JS con Web Components) manteniendo todas las funcionalidades existentes.

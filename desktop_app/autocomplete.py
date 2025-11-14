@@ -6,7 +6,7 @@ from tkinter import Listbox, END, ACTIVE
 from typing import List, Optional
 import re
 
-from voicings import INTERVALOS_TRADICIONALES, NOTAS, parsear_nombre_acorde
+from backend.voicings import INTERVALOS_TRADICIONALES, NOTAS, parsear_nombre_acorde
 
 
 class ChordAutocomplete(ctk.CTkTextbox):
