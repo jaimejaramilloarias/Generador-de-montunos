@@ -3,8 +3,31 @@ import { resolve } from 'path';
 
 const DEFAULT_REPO_BASE = 'Generador-de-montunos';
 
+function normalizeBase(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(value);
+    value = url.pathname;
+  } catch {
+    // Ignore parsing errors – treat the value as a plain path.
+  }
+
+  if (!value.startsWith('/')) {
+    value = `/${value}`;
+  }
+
+  if (!value.endsWith('/')) {
+    value = `${value}/`;
+  }
+
+  return value;
+}
+
 export default defineConfig(({ command }) => {
-  const envBase = process.env.GHPAGES_BASE ?? process.env.PUBLIC_URL;
+  const envBase = normalizeBase(process.env.GHPAGES_BASE ?? process.env.PUBLIC_URL);
   const base = command === 'serve' ? '/' : envBase ?? `/${DEFAULT_REPO_BASE}/`;
 
   return {
