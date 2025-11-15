@@ -35,6 +35,9 @@ describe('generateMontuno', () => {
     generated: undefined,
     savedProgressions: [],
     activeProgressionId: null,
+    midiStatus: 'idle',
+    midiOutputs: [],
+    selectedMidiOutputId: null,
   };
 
   it('produce eventos y metadatos a partir del resultado del backend', async () => {

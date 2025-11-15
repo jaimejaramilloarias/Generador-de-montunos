@@ -90,9 +90,12 @@ const salsaBase: Record<Variacion, PatternStep[]> = {
   ],
 };
 
-export function getPattern(modo: 'Tradicional' | 'Salsa', variation: Variacion): PatternStep[] {
+export function getPattern(modo: 'Tradicional' | 'Extendido' | 'Salsa', variation: Variacion): PatternStep[] {
   const source = modo === 'Salsa' ? salsaBase : tradBase;
-  return source[variation].map((step) => ({ ...step }));
+  return source[variation].map((step) => ({
+    ...step,
+    roles: [...step.roles],
+  }));
 }
 
 export function getPatternLengthBeats(): number {

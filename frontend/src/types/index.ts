@@ -1,4 +1,4 @@
-export type Modo = 'Tradicional' | 'Salsa';
+export type Modo = 'Tradicional' | 'Extendido' | 'Salsa';
 export type Armonizacion = 'Octavas' | 'Doble octava' | 'Décimas' | 'Treceavas';
 export type Variacion = 'A' | 'B' | 'C' | 'D';
 export type Inversion = 'root' | 'third' | 'fifth' | 'seventh';
@@ -34,6 +34,9 @@ export interface AppState {
   generated?: GenerationResult;
   savedProgressions: SavedProgression[];
   activeProgressionId: string | null;
+  midiStatus: MidiStatus;
+  midiOutputs: MidiOutputInfo[];
+  selectedMidiOutputId: string | null;
 }
 
 export interface GenerationResult {
@@ -65,6 +68,15 @@ export interface PersistedState {
   bpm: number;
   savedProgressions?: SavedProgression[];
   activeProgressionId?: string | null;
+  selectedMidiOutputId?: string | null;
+}
+
+export type MidiStatus = 'unavailable' | 'idle' | 'pending' | 'ready' | 'denied';
+
+export interface MidiOutputInfo {
+  id: string;
+  name: string;
+  manufacturer?: string | null;
 }
 
 export interface ParsedChord {

@@ -3,6 +3,8 @@ import type {
   ChordConfig,
   GenerationResult,
   Inversion,
+  MidiOutputInfo,
+  MidiStatus,
   Modo,
   SavedProgression,
   Variacion,
@@ -53,6 +55,13 @@ function createDefaultProgressionName(current: SavedProgression[]): string {
   return candidate;
 }
 
+function detectInitialMidiStatus(): MidiStatus {
+  if (typeof navigator === 'undefined') {
+    return 'unavailable';
+  }
+  return typeof navigator.requestMIDIAccess === 'function' ? 'idle' : 'unavailable';
+}
+
 function createInitialState(): AppState {
   const persisted = loadPreferences();
   const savedProgressions = normaliseSavedProgressions(persisted?.savedProgressions);
@@ -64,6 +73,7 @@ function createInitialState(): AppState {
     ? savedProgressions.find((item) => item.id === activeFromPersisted) ?? null
     : null;
   const progressionInput = activeProgression?.progression ?? persisted?.progressionInput ?? 'Cmaj7 F7 | G7 Cmaj7';
+  const midiStatus = detectInitialMidiStatus();
   const base: AppState = {
     progressionInput,
     clave: persisted?.clave && CLAVES[persisted.clave] ? persisted.clave : 'Clave 2-3',
@@ -87,6 +97,9 @@ function createInitialState(): AppState {
     generated: undefined,
     savedProgressions,
     activeProgressionId: activeFromPersisted,
+    midiStatus,
+    midiOutputs: [],
+    selectedMidiOutputId: midiStatus === 'unavailable' ? null : persisted?.selectedMidiOutputId ?? null,
   };
   const { chords, errors } = buildChords(base.progressionInput, base);
   base.chords = chords;
@@ -247,6 +260,18 @@ export function setIsPlaying(isPlaying: boolean): void {
 export function setIsGenerating(isGenerating: boolean): void {
   state = { ...state, isGenerating };
   emit();
+}
+
+export function setMidiStatus(status: MidiStatus): void {
+  updateState({ midiStatus: status });
+}
+
+export function setMidiOutputs(outputs: MidiOutputInfo[]): void {
+  updateState({ midiOutputs: outputs });
+}
+
+export function setSelectedMidiOutput(id: string | null): void {
+  updateState({ selectedMidiOutputId: id });
 }
 
 export function resetPlayback(): void {

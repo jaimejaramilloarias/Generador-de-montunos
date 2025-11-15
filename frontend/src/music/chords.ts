@@ -23,20 +23,35 @@ const NOTE_TO_SEMITONE: Record<string, number> = {
 const QUALITY_INTERVALS: Record<string, number[]> = {
   maj: [0, 4, 7],
   maj7: [0, 4, 7, 11],
+  maj9: [0, 4, 7, 11, 14],
+  maj11: [0, 4, 7, 11, 17],
+  maj13: [0, 4, 7, 11, 21],
   m: [0, 3, 7],
   m7: [0, 3, 7, 10],
+  m9: [0, 3, 7, 10, 14],
+  m11: [0, 3, 7, 10, 17],
+  m13: [0, 3, 7, 10, 21],
   dim: [0, 3, 6],
   dim7: [0, 3, 6, 9],
   aug: [0, 4, 8],
   sus2: [0, 2, 7],
   sus4: [0, 5, 7],
   dom7: [0, 4, 7, 10],
+  dom9: [0, 4, 7, 10, 14],
+  dom11: [0, 4, 7, 10, 17],
+  dom13: [0, 4, 7, 10, 21],
 };
 
 const DEFAULT_INTERVALS = [0, 4, 7];
 
 function detectIntervals(chordName: string): number[] {
   const lowered = chordName.toLowerCase();
+  if (chordName.includes('∆13') || lowered.includes('maj13')) return QUALITY_INTERVALS.maj13;
+  if (chordName.includes('∆11') || lowered.includes('maj11')) return QUALITY_INTERVALS.maj11;
+  if (chordName.includes('∆9') || lowered.includes('maj9')) return QUALITY_INTERVALS.maj9;
+  if (lowered.includes('m13')) return QUALITY_INTERVALS.m13;
+  if (lowered.includes('m11')) return QUALITY_INTERVALS.m11;
+  if (lowered.includes('m9')) return QUALITY_INTERVALS.m9;
   if (lowered.includes('sus2')) return QUALITY_INTERVALS.sus2;
   if (lowered.includes('sus4')) return QUALITY_INTERVALS.sus4;
   if (lowered.includes('dim7') || lowered.includes('º7') || lowered.includes('°7')) return QUALITY_INTERVALS.dim7;
@@ -47,6 +62,9 @@ function detectIntervals(chordName: string): number[] {
   if (lowered.includes('m7b5')) return [0, 3, 6, 10];
   if (lowered.includes('m7')) return QUALITY_INTERVALS.m7;
   if (lowered.includes('m')) return QUALITY_INTERVALS.m;
+  if (lowered.includes('13')) return QUALITY_INTERVALS.dom13;
+  if (lowered.includes('11')) return QUALITY_INTERVALS.dom11;
+  if (lowered.includes('9')) return QUALITY_INTERVALS.dom9;
   if (lowered.includes('7')) return QUALITY_INTERVALS.dom7;
   return DEFAULT_INTERVALS;
 }

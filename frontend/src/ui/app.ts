@@ -10,6 +10,9 @@ import {
   setDefaultArmonizacion,
   setDefaultInversion,
   setDefaultModo,
+  setMidiOutputs,
+  setMidiStatus,
+  setSelectedMidiOutput,
   setErrors,
   setGenerated,
   setIsPlaying,
@@ -20,15 +23,18 @@ import {
   subscribe,
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
-import type { AppState, ChordConfig, GenerationResult } from '../types';
+import type { AppState, ChordConfig, GenerationResult, MidiStatus } from '../types';
 
 type GeneratorModule = typeof import('../music/generator');
 type AudioModule = typeof import('../audio/player');
 type MidiExportModule = typeof import('../utils/midiExport');
+type MidiManagerModule = typeof import('../midi/manager');
 
 let generatorModulePromise: Promise<GeneratorModule> | null = null;
 let audioModulePromise: Promise<AudioModule> | null = null;
-let midiModulePromise: Promise<MidiExportModule> | null = null;
+let midiExportModulePromise: Promise<MidiExportModule> | null = null;
+let midiManagerModulePromise: Promise<MidiManagerModule> | null = null;
+let midiOutputsUnsubscribe: (() => void) | null = null;
 
 interface UiRefs {
   progressionInput: HTMLTextAreaElement;
@@ -48,7 +54,26 @@ interface UiRefs {
   saveNameInput: HTMLInputElement;
   saveButton: HTMLButtonElement;
   savedList: HTMLUListElement;
+  midiEnableBtn: HTMLButtonElement;
+  midiOutputSelect: HTMLSelectElement;
+  midiStatusText: HTMLParagraphElement;
 }
+
+const MIDI_STATUS_MESSAGES: Record<MidiStatus, string> = {
+  unavailable: 'Este navegador no soporta la API Web MIDI.',
+  idle: 'Solicita acceso para listar los puertos MIDI disponibles.',
+  pending: 'Solicitando permisos MIDI…',
+  ready: 'Selecciona un puerto para enviar la reproducción en tiempo real.',
+  denied: 'El acceso MIDI fue denegado. Intenta permitirlo nuevamente.',
+};
+
+const MIDI_BUTTON_LABELS: Record<MidiStatus, string> = {
+  unavailable: 'MIDI no disponible',
+  idle: 'Activar MIDI',
+  pending: 'Activando…',
+  ready: 'Actualizar puertos',
+  denied: 'Reintentar acceso',
+};
 
 function getGeneratorModule(): Promise<GeneratorModule> {
   if (!generatorModulePromise) {
@@ -64,18 +89,25 @@ function getAudioModule(): Promise<AudioModule> {
   return audioModulePromise;
 }
 
-function getMidiModule(): Promise<MidiExportModule> {
-  if (!midiModulePromise) {
-    midiModulePromise = import('../utils/midiExport');
+function getMidiExportModule(): Promise<MidiExportModule> {
+  if (!midiExportModulePromise) {
+    midiExportModulePromise = import('../utils/midiExport');
   }
-  return midiModulePromise;
+  return midiExportModulePromise;
+}
+
+function getMidiManagerModule(): Promise<MidiManagerModule> {
+  if (!midiManagerModulePromise) {
+    midiManagerModulePromise = import('../midi/manager');
+  }
+  return midiManagerModulePromise;
 }
 
 function scheduleModulePrefetch(): void {
   window.setTimeout(() => {
     void getGeneratorModule();
     void getAudioModule();
-    void getMidiModule();
+    void getMidiExportModule();
   }, 250);
 }
 
@@ -165,6 +197,19 @@ function buildLayout(): string {
           </section>
           <section class="panel__section">
             <header class="panel__section-header">
+              <h2>Conexión MIDI</h2>
+              <p>Envía el montuno a un dispositivo local mediante Web MIDI.</p>
+            </header>
+            <div class="midi-controls">
+              <button type="button" id="midi-enable" class="btn">Activar MIDI</button>
+              <select id="midi-output" disabled>
+                <option value="">Selecciona un puerto</option>
+              </select>
+            </div>
+            <p id="midi-status" class="midi-status">El navegador no ha solicitado acceso MIDI.</p>
+          </section>
+          <section class="panel__section">
+            <header class="panel__section-header">
               <h2>Progresiones guardadas</h2>
               <p>Conserva tus progresiones favoritas para reutilizarlas en el futuro.</p>
             </header>
@@ -216,6 +261,9 @@ function grabRefs(root: HTMLElement): UiRefs {
     saveNameInput: root.querySelector<HTMLInputElement>('#saved-name')!,
     saveButton: root.querySelector<HTMLButtonElement>('#save-progression')!,
     savedList: root.querySelector<HTMLUListElement>('#saved-progressions')!,
+    midiEnableBtn: root.querySelector<HTMLButtonElement>('#midi-enable')!,
+    midiOutputSelect: root.querySelector<HTMLSelectElement>('#midi-output')!,
+    midiStatusText: root.querySelector<HTMLParagraphElement>('#midi-status')!,
   };
 }
 
@@ -275,6 +323,59 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     }
   });
 
+  refs.midiEnableBtn.addEventListener('click', async () => {
+    const status = getState().midiStatus;
+    if (status === 'pending' || status === 'unavailable') {
+      return;
+    }
+    setMidiStatus('pending');
+    try {
+      const midi = await getMidiManagerModule();
+      const result = await midi.requestMidiAccess();
+      setMidiStatus(result.status);
+      setMidiOutputs(result.outputs ?? []);
+      if (midiOutputsUnsubscribe) {
+        midiOutputsUnsubscribe();
+        midiOutputsUnsubscribe = null;
+      }
+      if (result.status === 'ready') {
+        midiOutputsUnsubscribe = midi.onOutputsChanged((outputs) => {
+          setMidiOutputs(outputs);
+          const current = getState();
+          if (current.selectedMidiOutputId && !outputs.some((output) => output.id === current.selectedMidiOutputId)) {
+            setSelectedMidiOutput(null);
+          } else if (current.selectedMidiOutputId) {
+            midi.setSelectedOutput(current.selectedMidiOutputId);
+          }
+        });
+        const desired = getState().selectedMidiOutputId;
+        if (desired) {
+          midi.setSelectedOutput(desired);
+        }
+      }
+    } catch (error) {
+      console.warn('No se pudo inicializar Web MIDI.', error);
+      setMidiStatus('denied');
+      setMidiOutputs([]);
+    }
+  });
+
+  refs.midiOutputSelect.addEventListener('change', async (event) => {
+    const state = getState();
+    if (state.midiStatus !== 'ready') {
+      return;
+    }
+    const value = (event.target as HTMLSelectElement).value;
+    const nextId = value === '' ? null : value;
+    setSelectedMidiOutput(nextId);
+    try {
+      const midi = await getMidiManagerModule();
+      midi.setSelectedOutput(nextId);
+    } catch (error) {
+      console.warn('No se pudo actualizar el puerto MIDI seleccionado.', error);
+    }
+  });
+
   const form = root.querySelector<HTMLFormElement>('#montuno-form');
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -292,19 +393,39 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
         return;
       }
     }
+
+    const midiState = getState();
+    const midi = midiState.midiStatus === 'ready'
+      ? await getMidiManagerModule().catch((error) => {
+          console.warn('No se pudo acceder al administrador MIDI.', error);
+          return null;
+        })
+      : null;
+
     if (state.isPlaying || audio.isPlaying()) {
       audio.stop();
+      midi?.stopPlayback();
       resetPlayback();
       setIsPlaying(false);
       return;
     }
+
     await audio.loadSequence(result.events, result.bpm);
+    if (midi) {
+      try {
+        midi.preparePlayback(result.events, result.bpm);
+        midi.startPlayback();
+      } catch (error) {
+        console.warn('No se pudo iniciar la reproducción MIDI.', error);
+      }
+    }
     audio.play();
     setIsPlaying(true);
     window.setTimeout(() => {
       if (audio.isPlaying()) {
         audio.stop();
       }
+      midi?.stopPlayback();
       setIsPlaying(false);
     }, result.durationSeconds * 1000 + 100);
   });
@@ -314,7 +435,7 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     if (!state.generated) {
       return;
     }
-    const { generateMidiBlob } = await getMidiModule();
+    const { generateMidiBlob } = await getMidiExportModule();
     const blob = generateMidiBlob(state.generated);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -358,6 +479,16 @@ async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefine
         console.warn('No se pudo preparar la reproducción del montuno.', error);
       });
 
+    if (getState().midiStatus === 'ready') {
+      void getMidiManagerModule()
+        .then((midi) => {
+          midi.preparePlayback(result.events, result.bpm);
+        })
+        .catch((error: unknown) => {
+          console.warn('No se pudo preparar la salida MIDI.', error);
+        });
+    }
+
     return result;
   } catch (error) {
     console.error(error);
@@ -398,6 +529,7 @@ function updateUi(state: AppState, refs: UiRefs): void {
   renderErrors(state.errors, refs);
   renderSummary(state, refs.summary);
   renderSavedProgressions(state, refs);
+  renderMidi(state, refs);
 
   const progressionEmpty = state.progressionInput.trim().length === 0;
   const hasBlockingErrors = state.errors.length > 0;
@@ -596,4 +728,35 @@ function renderSavedProgressions(state: AppState, refs: UiRefs): void {
     entry.append(info, actions);
     list.appendChild(entry);
   });
+}
+
+function renderMidi(state: AppState, refs: UiRefs): void {
+  const { midiStatus, midiOutputs, selectedMidiOutputId } = state;
+  const baseMessage = MIDI_STATUS_MESSAGES[midiStatus];
+  if (midiStatus === 'ready' && midiOutputs.length === 0) {
+    refs.midiStatusText.textContent = 'No se detectaron puertos MIDI. Conecta un dispositivo y pulsa “Actualizar puertos”.';
+  } else {
+    refs.midiStatusText.textContent = baseMessage;
+  }
+
+  refs.midiEnableBtn.textContent = MIDI_BUTTON_LABELS[midiStatus];
+  refs.midiEnableBtn.disabled = midiStatus === 'pending' || midiStatus === 'unavailable';
+
+  const select = refs.midiOutputSelect;
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = midiOutputs.length ? 'Selecciona un puerto' : 'Sin puertos disponibles';
+  select.appendChild(placeholder);
+
+  midiOutputs.forEach((output) => {
+    const option = document.createElement('option');
+    option.value = output.id;
+    option.textContent = output.manufacturer ? `${output.name} (${output.manufacturer})` : output.name;
+    select.appendChild(option);
+  });
+
+  const desired = selectedMidiOutputId ?? '';
+  select.value = midiOutputs.some((output) => output.id === desired) ? desired : '';
+  select.disabled = midiStatus !== 'ready' || midiOutputs.length === 0;
 }
