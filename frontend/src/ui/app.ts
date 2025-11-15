@@ -13,6 +13,7 @@ import {
   setErrors,
   setGenerated,
   setIsPlaying,
+  setIsGenerating,
   setProgression,
   setSeed,
   setVariation,
@@ -338,12 +339,14 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
 }
 
 async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefined> {
-  const state = getState();
-  if (state.errors.length) {
+  const initialState = getState();
+  if (initialState.errors.length) {
     return undefined;
   }
+  setIsGenerating(true);
   try {
     const [generator, audio] = await Promise.all([getGeneratorModule(), getAudioModule()]);
+    const state = getState();
     const result = await generator.generateMontuno(state);
     await audio.loadSequence(result.events, result.bpm);
     resetPlayback();
@@ -356,6 +359,8 @@ async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefine
     setErrors([message]);
     setGenerated(undefined);
     return undefined;
+  } finally {
+    setIsGenerating(false);
   }
 }
 
@@ -388,10 +393,13 @@ function updateUi(state: AppState, refs: UiRefs): void {
   renderSummary(state, refs.summary);
   renderSavedProgressions(state, refs);
 
-  refs.generateBtn.disabled = state.progressionInput.trim().length === 0 || state.errors.length > 0;
-  refs.playBtn.disabled = !state.generated && (state.progressionInput.trim().length === 0 || state.errors.length > 0);
+  const progressionEmpty = state.progressionInput.trim().length === 0;
+  const hasBlockingErrors = state.errors.length > 0;
+  refs.generateBtn.disabled = state.isGenerating || progressionEmpty || hasBlockingErrors;
+  refs.playBtn.disabled =
+    state.isGenerating || (!state.generated && (progressionEmpty || hasBlockingErrors));
   refs.playBtn.textContent = state.isPlaying ? 'Detener' : 'Reproducir';
-  refs.downloadBtn.disabled = !state.generated;
+  refs.downloadBtn.disabled = state.isGenerating || !state.generated;
   refs.saveButton.disabled = state.progressionInput.trim().length === 0 || state.errors.length > 0;
   refs.saveButton.textContent = state.activeProgressionId ? 'Actualizar progresión' : 'Guardar progresión';
 
@@ -485,6 +493,13 @@ function renderErrors(errors: string[], refs: UiRefs): void {
 }
 
 function renderSummary(state: AppState, container: HTMLDivElement): void {
+  if (state.isGenerating) {
+    container.innerHTML = `
+      <p><strong>Compases:</strong> Calculando…</p>
+      <p>Generando montuno, esto puede tardar unos segundos.</p>
+    `;
+    return;
+  }
   if (!state.generated) {
     container.innerHTML = '<p>Genera un montuno para ver los detalles de duración, compases y variaciones.</p>';
     return;
