@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { Midi } from '@tonejs/midi';
 import fixtureRaw from './__fixtures__/tradicional.json?raw';
 
 const fixture = JSON.parse(fixtureRaw);
@@ -40,6 +41,10 @@ describe('generateMontuno', () => {
     selectedMidiOutputId: null,
   };
 
+  beforeEach(() => {
+    (generateMontunoRaw as unknown as Mock).mockResolvedValue(fixture);
+  });
+
   it('produce eventos y metadatos a partir del resultado del backend', async () => {
     const result = await generateMontuno(baseState);
     expect(result.events.length).toBeGreaterThan(0);
@@ -66,5 +71,53 @@ describe('generateMontuno', () => {
     const result = await generateMontuno(baseState);
     const expectedSeconds = fixture.max_eighths * (60 / baseState.bpm / 2);
     expect(Number(result.durationSeconds.toFixed(6))).toBeCloseTo(expectedSeconds, 6);
+  });
+
+  it('propaga correctamente los modos extendidos y por acorde', async () => {
+    const customState: AppState = {
+      ...baseState,
+      modoDefault: 'Extendido',
+      chords: baseState.chords.map((chord, index) =>
+        index % 2 === 0
+          ? { ...chord, modo: 'Extendido' }
+          : { ...chord, modo: 'Tradicional' }
+      ),
+    };
+
+    await generateMontuno(customState);
+
+    expect(generateMontunoRaw).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modoDefault: 'Extendido',
+        chords: customState.chords.map((chord) => ({
+          index: chord.index,
+          modo: chord.modo,
+          armonizacion: chord.armonizacion,
+          inversion: chord.inversion,
+        })),
+      }),
+      expect.any(String)
+    );
+  });
+
+  it('recorta notas superpuestas cuando cambian los modos por acorde', async () => {
+    const midi = new Midi();
+    const track = midi.addTrack();
+    track.addNote({ midi: 60, ticks: 0, durationTicks: 480, velocity: 0.8 });
+    track.addNote({ midi: 60, ticks: 360, durationTicks: 480, velocity: 0.7 });
+    const buffer = midi.toArray();
+    const base64 = Buffer.from(buffer).toString('base64');
+
+    (generateMontunoRaw as unknown as Mock).mockResolvedValueOnce({
+      ...fixture,
+      midi_base64: base64,
+      max_eighths: 8,
+    });
+
+    const result = await generateMontuno(baseState);
+
+    expect(result.events).toHaveLength(2);
+    expect(result.events[0]).toMatchObject({ time: 0, duration: 0.75 });
+    expect(result.events[1]).toMatchObject({ time: 0.75 });
   });
 });

@@ -24,6 +24,7 @@ import {
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
 import type { AppState, ChordConfig, GenerationResult, MidiStatus } from '../types';
+import { autocompleteChordSuffix } from '../utils/chordAutocomplete';
 
 type GeneratorModule = typeof import('../music/generator');
 type AudioModule = typeof import('../audio/player');
@@ -269,8 +270,17 @@ function grabRefs(root: HTMLElement): UiRefs {
 
 function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
   refs.progressionInput.addEventListener('input', (event) => {
-    const value = (event.target as HTMLTextAreaElement).value;
-    setProgression(value);
+    const input = event.target as HTMLTextAreaElement;
+    const originalValue = input.value;
+    const cursor = input.selectionStart ?? originalValue.length;
+    const { text: completed, cursor: nextCursor } = autocompleteChordSuffix(originalValue, cursor);
+    if (completed !== originalValue) {
+      input.value = completed;
+      if (typeof nextCursor === 'number') {
+        input.setSelectionRange(nextCursor, nextCursor);
+      }
+    }
+    setProgression(input.value);
   });
 
   populateSelect(
@@ -374,6 +384,15 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     } catch (error) {
       console.warn('No se pudo actualizar el puerto MIDI seleccionado.', error);
     }
+
+    if (nextId) {
+      try {
+        const audio = await getAudioModule();
+        audio.stop();
+      } catch (error) {
+        console.warn('No se pudo detener el audio web al seleccionar MIDI.', error);
+      }
+    }
   });
 
   const form = root.querySelector<HTMLFormElement>('#montuno-form');
@@ -383,7 +402,9 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
   });
 
   refs.playBtn.addEventListener('click', async () => {
-    const audio = await getAudioModule();
+    const initialState = getState();
+    const useWebAudio = !initialState.selectedMidiOutputId;
+    const audio = useWebAudio ? await getAudioModule() : null;
     let state = getState();
     let result = state.generated;
     if (!result) {
@@ -402,15 +423,17 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
         })
       : null;
 
-    if (state.isPlaying || audio.isPlaying()) {
-      audio.stop();
+    if (state.isPlaying || (audio?.isPlaying?.() ?? false)) {
+      audio?.stop();
       midi?.stopPlayback();
       resetPlayback();
       setIsPlaying(false);
       return;
     }
 
-    await audio.loadSequence(result.events, result.bpm);
+    if (useWebAudio) {
+      await audio!.loadSequence(result.events, result.bpm);
+    }
     if (midi) {
       try {
         midi.preparePlayback(result.events, result.bpm);
@@ -419,10 +442,12 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
         console.warn('No se pudo iniciar la reproducción MIDI.', error);
       }
     }
-    audio.play();
+    if (useWebAudio) {
+      audio!.play();
+    }
     setIsPlaying(true);
     window.setTimeout(() => {
-      if (audio.isPlaying()) {
+      if (audio?.isPlaying?.()) {
         audio.stop();
       }
       midi?.stopPlayback();
@@ -466,18 +491,25 @@ async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefine
   }
   setIsGenerating(true);
   try {
-    const [generator, audio] = await Promise.all([getGeneratorModule(), getAudioModule()]);
+    const generatorPromise = getGeneratorModule();
     const state = getState();
+    const shouldPrepareAudio = !state.selectedMidiOutputId;
+    const audioPromise: Promise<AudioModule | null> = shouldPrepareAudio
+      ? getAudioModule()
+      : Promise.resolve<AudioModule | null>(null);
+    const [generator, audio] = await Promise.all([generatorPromise, audioPromise]);
     const result = await generator.generateMontuno(state);
     setGenerated(result);
     setErrors([]);
     resetPlayback();
 
-    void audio
-      .loadSequence(result.events, result.bpm)
-      .catch((error: unknown) => {
-        console.warn('No se pudo preparar la reproducción del montuno.', error);
-      });
+    if (audio) {
+      void audio
+        .loadSequence(result.events, result.bpm)
+        .catch((error: unknown) => {
+          console.warn('No se pudo preparar la reproducción del montuno.', error);
+        });
+    }
 
     if (getState().midiStatus === 'ready') {
       void getMidiManagerModule()
