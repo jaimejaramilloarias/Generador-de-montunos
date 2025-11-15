@@ -57,43 +57,7 @@ export interface AutocompleteResult {
 }
 
 export function autocompleteChordSuffix(text: string, cursorIndex: number): AutocompleteResult {
-  if (!text) {
-    return { text, cursor: cursorIndex };
-  }
-
-  const beforeCursor = text.slice(0, cursorIndex);
-  const tokenMatch = beforeCursor.match(TOKEN_REGEX);
-  if (!tokenMatch) {
-    return { text, cursor: cursorIndex };
-  }
-
-  const token = tokenMatch[0];
-  const tokenStart = beforeCursor.length - token.length;
-  const rootMatch = token.match(ROOT_REGEX);
-  if (!rootMatch) {
-    return { text, cursor: cursorIndex };
-  }
-
-  const [, root, suffix] = rootMatch;
-  if (!suffix) {
-    return { text, cursor: cursorIndex };
-  }
-
-  const completedSuffix = completeSuffix(suffix);
-  if (completedSuffix === null) {
-    return { text, cursor: cursorIndex };
-  }
-
-  const updatedToken = applyChordReplacements(`${root}${completedSuffix}`);
-  const resultToken = updatedToken || `${root}${completedSuffix}`;
-  if (resultToken === token) {
-    return { text, cursor: cursorIndex };
-  }
-
-  const nextText = `${text.slice(0, tokenStart)}${resultToken}${text.slice(tokenStart + token.length)}`;
-  const cursorDelta = resultToken.length - token.length;
-  const nextCursor = cursorIndex + cursorDelta;
-  return { text: nextText, cursor: nextCursor };
+  return { text, cursor: cursorIndex };
 }
 
 export function getChordSuffixSuggestions(text: string, cursorIndex: number): string[] {
@@ -104,39 +68,14 @@ export function getChordSuffixSuggestions(text: string, cursorIndex: number): st
   const beforeCursor = text.slice(0, cursorIndex);
   const tokenMatch = beforeCursor.match(TOKEN_REGEX);
   if (!tokenMatch) {
-    return [];
+    return CHORD_SUFFIX_SUGGESTIONS;
   }
 
   const token = tokenMatch[0];
   const rootMatch = token.match(ROOT_REGEX);
   if (!rootMatch) {
-    return [];
-  }
-
-  const [, , suffix] = rootMatch;
-  if (!suffix) {
     return CHORD_SUFFIX_SUGGESTIONS;
   }
 
-  const normalised = suffix.toLowerCase();
-  return CHORD_SUFFIX_SUGGESTIONS.filter((item) => item.toLowerCase().startsWith(normalised));
-}
-
-function completeSuffix(suffix: string): string | null {
-  for (const rule of SUFFIX_RULES) {
-    if (rule.test.test(suffix)) {
-      return rule.completion;
-    }
-  }
-
-  if (suffix.includes('(') || suffix.includes(')')) {
-    return null;
-  }
-
-  const replaced = applyChordReplacements(`C${suffix}`);
-  if (replaced && replaced !== `C${suffix}`) {
-    return replaced.slice(1);
-  }
-
-  return null;
+  return CHORD_SUFFIX_SUGGESTIONS;
 }

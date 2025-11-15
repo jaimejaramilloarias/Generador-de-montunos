@@ -24,11 +24,7 @@ import {
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
 import type { AppState, ChordConfig, GenerationResult, MidiStatus } from '../types';
-import {
-  autocompleteChordSuffix,
-  CHORD_SUFFIX_SUGGESTIONS,
-  getChordSuffixSuggestions,
-} from '../utils/chordAutocomplete';
+import { CHORD_SUFFIX_SUGGESTIONS, getChordSuffixSuggestions } from '../utils/chordAutocomplete';
 
 type GeneratorModule = typeof import('../music/generator');
 type AudioModule = typeof import('../audio/player');
@@ -115,6 +111,14 @@ function scheduleModulePrefetch(): void {
     void getAudioModule();
     void getMidiExportModule();
   }, 250);
+}
+
+async function ensureWebAudioReady(audio: AudioModule): Promise<void> {
+  try {
+    await audio.prepareAudio();
+  } catch (error) {
+    console.warn('No se pudo inicializar el motor de audio.', error);
+  }
 }
 
 async function getExistingAudioModule(): Promise<AudioModule | null> {
@@ -394,15 +398,6 @@ function grabRefs(root: HTMLElement): UiRefs {
 function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
   refs.progressionInput.addEventListener('input', (event) => {
     const input = event.target as HTMLTextAreaElement;
-    const originalValue = input.value;
-    const cursor = input.selectionStart ?? originalValue.length;
-    const { text: completed, cursor: nextCursor } = autocompleteChordSuffix(originalValue, cursor);
-    if (completed !== originalValue) {
-      input.value = completed;
-      if (typeof nextCursor === 'number') {
-        input.setSelectionRange(nextCursor, nextCursor);
-      }
-    }
     setProgression(input.value);
     refreshChordSuffixHints(refs);
   });
@@ -525,6 +520,9 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     const initialState = getState();
     const useWebAudio = !initialState.selectedMidiOutputId;
     const audio = useWebAudio ? await getAudioModule() : null;
+    if (audio) {
+      await ensureWebAudioReady(audio);
+    }
     let state = getState();
     let result = state.generated;
     if (!result) {
@@ -624,11 +622,13 @@ async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefine
     resetPlayback();
 
     if (audio) {
-      void audio
-        .loadSequence(result.events, result.bpm)
-        .catch((error: unknown) => {
-          console.warn('No se pudo preparar la reproducción del montuno.', error);
-        });
+      void ensureWebAudioReady(audio).then(() =>
+        audio
+          .loadSequence(result.events, result.bpm)
+          .catch((error: unknown) => {
+            console.warn('No se pudo preparar la reproducción del montuno.', error);
+          })
+      );
     }
 
     if (getState().midiStatus === 'ready') {
