@@ -109,9 +109,7 @@ async function ensurePyodide(_baseUrl: string): Promise<PyodideInterface> {
       await ensurePyodideLoader();
       const pyodide = await ctx.loadPyodide!({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/' });
       await pyodide.loadPackage(['micropip', 'numpy', 'scipy']);
-      await pyodide.runPythonAsync(
-        'import micropip\nawait micropip.install(["mido", "pretty_midi"])'
-      );
+      await pyodide.runPythonAsync('import micropip\nawait micropip.install(["mido"])');
       for (const [path, source] of Object.entries(PYTHON_SOURCES)) {
         writeTextFile(pyodide, path, source);
       }
