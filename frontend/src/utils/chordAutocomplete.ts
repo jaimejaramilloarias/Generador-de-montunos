@@ -1,5 +1,6 @@
 import rawReplacements from '@shared/chord_replacements.json?raw';
 import { applyChordReplacements } from '../music/chordNormalizer';
+import { CHORD_SUFFIXES } from './chordValidation';
 
 const ROOT_REGEX = /^([A-Ga-g](?:#|b)?)(.*)$/;
 const TOKEN_REGEX = /[^\s|]+$/;
@@ -47,7 +48,11 @@ const replacementSuffixes = replacementEntries
 
 const ruleSuffixes = SUFFIX_RULES.map((rule) => normaliseSuffix(rule.completion));
 
-export const CHORD_SUFFIX_SUGGESTIONS = Array.from(new Set([...replacementSuffixes, ...ruleSuffixes]))
+const knownSuffixes = CHORD_SUFFIXES.map((suffix) => normaliseSuffix(suffix));
+
+export const CHORD_SUFFIX_SUGGESTIONS = Array.from(
+  new Set([...knownSuffixes, ...replacementSuffixes, ...ruleSuffixes])
+)
   .filter((suffix) => suffix.length > 0)
   .sort((a, b) => a.localeCompare(b, 'es'));
 

@@ -1,4 +1,4 @@
-const VALID_SUFFIXES = new Set([
+export const CHORD_SUFFIXES = [
   '6',
   '7',
   '∆',
@@ -20,7 +20,23 @@ const VALID_SUFFIXES = new Set([
   '7(b5)b9',
   '7sus4(b9)',
   '∆(b5)',
-]);
+  '9',
+  '11',
+  '13',
+  '∆9',
+  '∆11',
+  '∆13',
+  'm9',
+  'm11',
+  'm13',
+  '7(9)',
+  '7(13)',
+  'm7(9)',
+  'm7(11)',
+  'm7(13)',
+] as const;
+
+const VALID_SUFFIXES = new Set(CHORD_SUFFIXES);
 
 const ROOT_REGEX = /^([A-G](?:#|b)?)(.*)$/i;
 const FORCED_INVERSION_REGEX = /\/(?:[1357])$/;

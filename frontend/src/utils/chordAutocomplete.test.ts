@@ -25,4 +25,13 @@ describe('getChordSuffixSuggestions', () => {
     const suggestions = getChordSuffixSuggestions('Cm', 2);
     expect(suggestions).toEqual(CHORD_SUFFIX_SUGGESTIONS);
   });
+
+  it('incluye los sufijos extendidos en las sugerencias', () => {
+    expect(CHORD_SUFFIX_SUGGESTIONS).toEqual(
+      [...CHORD_SUFFIX_SUGGESTIONS].sort((a, b) => a.localeCompare(b, 'es'))
+    );
+    expect(CHORD_SUFFIX_SUGGESTIONS).toContain('13');
+    expect(CHORD_SUFFIX_SUGGESTIONS).toContain('m7(13)');
+    expect(CHORD_SUFFIX_SUGGESTIONS).toContain('∆11');
+  });
 });

@@ -44,4 +44,11 @@ describe('parseProgression', () => {
     expect(result.chords[1]?.isRecognized).toBe(false);
     expect(result.errors.some((error) => error.includes('Acorde no reconocido'))).toBe(true);
   });
+
+  it('reconoce acordes con extensiones avanzadas', () => {
+    const result = parseProgression('C13 | Gm7(11)', { armonizacionDefault: 'Octavas' });
+    expect(result.errors).toHaveLength(0);
+    expect(result.chords.map((c) => c.name)).toEqual(['C13', 'Gm7(11)']);
+    expect(result.chords.every((c) => c.isRecognized)).toBe(true);
+  });
 });
