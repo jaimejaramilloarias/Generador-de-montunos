@@ -74,12 +74,14 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
     return a.time - b.time;
   });
 
+  const sanitizedEvents = trimOverlappingNotes(events);
+
   const secondsPerEighth = 60 / state.bpm / 2;
   const durationSeconds = raw.max_eighths * secondsPerEighth;
   const lengthBars = Math.max(1, Math.ceil(raw.max_eighths / 8));
 
   return {
-    events,
+    events: sanitizedEvents,
     lengthBars,
     bpm: state.bpm,
     durationSeconds,
@@ -98,4 +100,36 @@ function base64ToUint8Array(base64: string): Uint8Array {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes;
+}
+
+function trimOverlappingNotes(events: NoteEvent[]): NoteEvent[] {
+  const sanitized: NoteEvent[] = [];
+  const lastByMidi = new Map<number, NoteEvent>();
+
+  events.forEach((original) => {
+    const current = { ...original };
+    const previous = lastByMidi.get(current.midi);
+    if (previous) {
+      const previousEnd = previous.time + previous.duration;
+      if (current.time < previousEnd) {
+        const adjustedDuration = Math.max(0, current.time - previous.time);
+        if (adjustedDuration <= 1e-6) {
+          const index = sanitized.indexOf(previous);
+          if (index !== -1) {
+            sanitized.splice(index, 1);
+          }
+          lastByMidi.delete(current.midi);
+        } else {
+          previous.duration = adjustedDuration;
+        }
+      }
+    }
+
+    if (current.duration > 0) {
+      sanitized.push(current);
+      lastByMidi.set(current.midi, current);
+    }
+  });
+
+  return sanitized.filter((event) => event.duration > 1e-6);
 }
