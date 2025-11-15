@@ -11,6 +11,7 @@ import backendVoicingsTrad from '../../../backend/voicings_tradicional.py?raw';
 import montunoInit from '../../../backend/montuno_core/__init__.py?raw';
 import montunoConfig from '../../../backend/montuno_core/config.py?raw';
 import montunoGeneration from '../../../backend/montuno_core/generation.py?raw';
+import prettyMidiStub from './pyodide_pretty_midi.py?raw';
 import chordReplacements from '@shared/chord_replacements.json?raw';
 
 export const PYTHON_SOURCES: Record<string, string> = {
@@ -27,6 +28,7 @@ export const PYTHON_SOURCES: Record<string, string> = {
   'backend/montuno_core/__init__.py': montunoInit,
   'backend/montuno_core/config.py': montunoConfig,
   'backend/montuno_core/generation.py': montunoGeneration,
+  'pretty_midi/__init__.py': prettyMidiStub,
 };
 
 export const PYTHON_DATA_FILES: Record<string, string> = {
