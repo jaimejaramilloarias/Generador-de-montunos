@@ -348,10 +348,16 @@ async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefine
     const [generator, audio] = await Promise.all([getGeneratorModule(), getAudioModule()]);
     const state = getState();
     const result = await generator.generateMontuno(state);
-    await audio.loadSequence(result.events, result.bpm);
-    resetPlayback();
     setGenerated(result);
     setErrors([]);
+    resetPlayback();
+
+    void audio
+      .loadSequence(result.events, result.bpm)
+      .catch((error: unknown) => {
+        console.warn('No se pudo preparar la reproducción del montuno.', error);
+      });
+
     return result;
   } catch (error) {
     console.error(error);
