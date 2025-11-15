@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { autocompleteChordSuffix } from './chordAutocomplete';
+import {
+  CHORD_SUFFIX_SUGGESTIONS,
+  autocompleteChordSuffix,
+  getChordSuffixSuggestions,
+} from './chordAutocomplete';
 
 describe('autocompleteChordSuffix', () => {
   it('completa sufijos mayores incompletos', () => {
@@ -28,5 +32,19 @@ describe('autocompleteChordSuffix', () => {
     const result = autocompleteChordSuffix(original, original.length);
     expect(result.text).toBe(original);
     expect(result.cursor).toBe(original.length);
+  });
+});
+
+describe('getChordSuffixSuggestions', () => {
+  it('devuelve todas las sugerencias cuando no hay sufijo', () => {
+    const suggestions = getChordSuffixSuggestions('C', 1);
+    expect(suggestions).toEqual(CHORD_SUFFIX_SUGGESTIONS);
+  });
+
+  it('filtra sufijos conocidos según el texto ingresado', () => {
+    const suggestions = getChordSuffixSuggestions('Cm', 2);
+    expect(suggestions).toContain('m7(b5)');
+    expect(suggestions).toContain('m∆');
+    expect(suggestions.every((item) => item.toLowerCase().startsWith('m'))).toBe(true);
   });
 });

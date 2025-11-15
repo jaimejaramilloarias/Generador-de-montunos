@@ -24,7 +24,11 @@ import {
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
 import type { AppState, ChordConfig, GenerationResult, MidiStatus } from '../types';
-import { autocompleteChordSuffix } from '../utils/chordAutocomplete';
+import {
+  autocompleteChordSuffix,
+  CHORD_SUFFIX_SUGGESTIONS,
+  getChordSuffixSuggestions,
+} from '../utils/chordAutocomplete';
 
 type GeneratorModule = typeof import('../music/generator');
 type AudioModule = typeof import('../audio/player');
@@ -55,6 +59,7 @@ interface UiRefs {
   saveNameInput: HTMLInputElement;
   saveButton: HTMLButtonElement;
   savedList: HTMLUListElement;
+  chordHints: HTMLDivElement;
   midiEnableBtn: HTMLButtonElement;
   midiOutputSelect: HTMLSelectElement;
   midiStatusText: HTMLParagraphElement;
@@ -112,6 +117,117 @@ function scheduleModulePrefetch(): void {
   }, 250);
 }
 
+async function getExistingAudioModule(): Promise<AudioModule | null> {
+  if (!audioModulePromise) {
+    return null;
+  }
+  try {
+    return await audioModulePromise;
+  } catch (error) {
+    console.warn('No se pudo acceder al sintetizador web.', error);
+    return null;
+  }
+}
+
+async function stopExistingWebAudio(): Promise<void> {
+  const audio = await getExistingAudioModule();
+  if (!audio) {
+    return;
+  }
+  try {
+    audio.stop();
+  } catch (error) {
+    console.warn('No se pudo detener el sintetizador web.', error);
+  }
+}
+
+async function applyMidiSelection(nextId: string | null, options?: { force?: boolean }): Promise<void> {
+  const previous = getState().selectedMidiOutputId;
+  const shouldUpdate = options?.force || previous !== nextId;
+  if (!shouldUpdate) {
+    return;
+  }
+
+  setSelectedMidiOutput(nextId);
+  resetPlayback();
+
+  const midiReady = getState().midiStatus === 'ready';
+  let midi: MidiManagerModule | null = null;
+  if (midiReady) {
+    try {
+      midi = await getMidiManagerModule();
+    } catch (error) {
+      console.warn('No se pudo acceder al administrador MIDI.', error);
+    }
+  }
+
+  if (nextId) {
+    await stopExistingWebAudio();
+    if (midi) {
+      try {
+        midi.stopPlayback();
+        midi.setSelectedOutput(nextId);
+        const state = getState();
+        if (state.generated) {
+          midi.preparePlayback(state.generated.events, state.generated.bpm);
+        }
+      } catch (error) {
+        console.warn('No se pudo actualizar el puerto MIDI seleccionado.', error);
+      }
+    }
+    return;
+  }
+
+  if (midi) {
+    try {
+      midi.stopPlayback();
+      midi.setSelectedOutput(null);
+    } catch (error) {
+      console.warn('No se pudo desactivar la salida MIDI.', error);
+    }
+  }
+
+  await stopExistingWebAudio();
+  const current = getState();
+  if (current.generated) {
+    try {
+      const audio = await getAudioModule();
+      await audio.loadSequence(current.generated.events, current.generated.bpm);
+    } catch (error) {
+      console.warn('No se pudo preparar el sintetizador web tras desactivar MIDI.', error);
+    }
+  }
+}
+
+function renderSuffixHints(container: HTMLDivElement, suggestions: string[]): void {
+  container.innerHTML = '';
+  if (!suggestions.length) {
+    container.classList.add('suffix-hints--hidden');
+    return;
+  }
+  container.classList.remove('suffix-hints--hidden');
+  const fragment = document.createDocumentFragment();
+  suggestions.forEach((item) => {
+    const badge = document.createElement('span');
+    badge.className = 'suffix-hints__item';
+    badge.textContent = item;
+    badge.setAttribute('role', 'listitem');
+    fragment.appendChild(badge);
+  });
+  container.appendChild(fragment);
+}
+
+function refreshChordSuffixHints(refs: UiRefs): void {
+  if (document.activeElement !== refs.progressionInput) {
+    renderSuffixHints(refs.chordHints, []);
+    return;
+  }
+  const cursor = refs.progressionInput.selectionStart ?? refs.progressionInput.value.length;
+  const matches = getChordSuffixSuggestions(refs.progressionInput.value, cursor);
+  const suggestions = matches.length ? matches : CHORD_SUFFIX_SUGGESTIONS;
+  renderSuffixHints(refs.chordHints, suggestions);
+}
+
 let lastActiveProgressionId: string | null = null;
 
 export function setupApp(root: HTMLElement): void {
@@ -127,7 +243,7 @@ function buildLayout(): string {
     <main class="app">
       <header class="app__header">
         <h1>Generador de Montunos</h1>
-        <p>Versión web experimental con reproducción directa en el navegador.</p>
+        <p>Desarrollado por Jaime Jaramillo Arias.</p>
       </header>
       <section class="app__body">
         <form class="panel" id="montuno-form">
@@ -135,6 +251,12 @@ function buildLayout(): string {
             <legend>Progresión de acordes</legend>
             <textarea id="progression" rows="4" spellcheck="false" placeholder="Cmaj7 F7 | G7 Cmaj7"></textarea>
             <p class="panel__hint">Separa acordes con espacios o barras verticales. Puedes incluir tensiones como Cm7(b5).</p>
+            <div
+              id="chord-suffix-hints"
+              class="suffix-hints suffix-hints--hidden"
+              role="list"
+              aria-live="polite"
+            ></div>
           </fieldset>
           <fieldset class="panel__section grid">
             <div>
@@ -262,6 +384,7 @@ function grabRefs(root: HTMLElement): UiRefs {
     saveNameInput: root.querySelector<HTMLInputElement>('#saved-name')!,
     saveButton: root.querySelector<HTMLButtonElement>('#save-progression')!,
     savedList: root.querySelector<HTMLUListElement>('#saved-progressions')!,
+    chordHints: root.querySelector<HTMLDivElement>('#chord-suffix-hints')!,
     midiEnableBtn: root.querySelector<HTMLButtonElement>('#midi-enable')!,
     midiOutputSelect: root.querySelector<HTMLSelectElement>('#midi-output')!,
     midiStatusText: root.querySelector<HTMLParagraphElement>('#midi-status')!,
@@ -281,6 +404,15 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
       }
     }
     setProgression(input.value);
+    refreshChordSuffixHints(refs);
+  });
+
+  refs.progressionInput.addEventListener('focus', () => {
+    refreshChordSuffixHints(refs);
+  });
+
+  refs.progressionInput.addEventListener('blur', () => {
+    renderSuffixHints(refs.chordHints, []);
   });
 
   populateSelect(
@@ -352,15 +484,18 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
         midiOutputsUnsubscribe = midi.onOutputsChanged((outputs) => {
           setMidiOutputs(outputs);
           const current = getState();
-          if (current.selectedMidiOutputId && !outputs.some((output) => output.id === current.selectedMidiOutputId)) {
-            setSelectedMidiOutput(null);
-          } else if (current.selectedMidiOutputId) {
-            midi.setSelectedOutput(current.selectedMidiOutputId);
+          const selectedId = current.selectedMidiOutputId;
+          if (selectedId && !outputs.some((output) => output.id === selectedId)) {
+            void applyMidiSelection(null);
+          } else if (selectedId) {
+            midi.setSelectedOutput(selectedId);
           }
         });
         const desired = getState().selectedMidiOutputId;
         if (desired) {
-          midi.setSelectedOutput(desired);
+          void applyMidiSelection(desired, { force: true });
+        } else {
+          void applyMidiSelection(null, { force: true });
         }
       }
     } catch (error) {
@@ -370,29 +505,14 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     }
   });
 
-  refs.midiOutputSelect.addEventListener('change', async (event) => {
+  refs.midiOutputSelect.addEventListener('change', (event) => {
     const state = getState();
     if (state.midiStatus !== 'ready') {
       return;
     }
     const value = (event.target as HTMLSelectElement).value;
     const nextId = value === '' ? null : value;
-    setSelectedMidiOutput(nextId);
-    try {
-      const midi = await getMidiManagerModule();
-      midi.setSelectedOutput(nextId);
-    } catch (error) {
-      console.warn('No se pudo actualizar el puerto MIDI seleccionado.', error);
-    }
-
-    if (nextId) {
-      try {
-        const audio = await getAudioModule();
-        audio.stop();
-      } catch (error) {
-        console.warn('No se pudo detener el audio web al seleccionar MIDI.', error);
-      }
-    }
+    void applyMidiSelection(nextId);
   });
 
   const form = root.querySelector<HTMLFormElement>('#montuno-form');
@@ -582,6 +702,7 @@ function updateUi(state: AppState, refs: UiRefs): void {
       ? 'Actualizar nombre de la progresión'
       : 'Intro en C mayor';
   }
+  refreshChordSuffixHints(refs);
   lastActiveProgressionId = state.activeProgressionId;
 }
 
