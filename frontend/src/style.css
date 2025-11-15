@@ -318,6 +318,14 @@ input[type='number'] {
   width: 100%;
 }
 
+.chord-cell {
+  font-weight: 600;
+}
+
+.chord-cell--invalid {
+  color: #ff8686;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
