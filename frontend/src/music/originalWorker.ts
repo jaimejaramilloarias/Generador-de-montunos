@@ -51,26 +51,36 @@ async function ensurePyodideLoader(): Promise<void> {
     return;
   }
 
-  if (typeof ctx.importScripts === 'function') {
+  const moduleUrl = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.mjs';
+  const scriptUrl = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
+  let lastError: unknown = null;
+
+  if (!ctx.loadPyodide) {
     try {
-      ctx.importScripts('https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js');
+      const module = (await import(/* @vite-ignore */ moduleUrl)) as PyodideLoaderModule;
+      ctx.loadPyodide = module.loadPyodide;
     } catch (error) {
-      console.warn('Fallo al cargar Pyodide mediante importScripts, intentando con módulo ESM.', error);
+      lastError = error;
+      console.warn('Fallo al importar Pyodide como módulo, intentando con importScripts.', error);
+    }
+  }
+
+  if (!ctx.loadPyodide && typeof ctx.importScripts === 'function') {
+    try {
+      ctx.importScripts(scriptUrl);
+    } catch (error) {
+      lastError = error;
+      console.warn('Fallo al cargar Pyodide mediante importScripts, intentando evaluar el bundle clásico.', error);
     }
   }
 
   if (!ctx.loadPyodide) {
-    try {
-      const module = (await import(
-        /* @vite-ignore */ 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.mjs'
-      )) as PyodideLoaderModule;
-      ctx.loadPyodide = module.loadPyodide;
-    } catch (error) {
-      console.warn('Fallo al importar Pyodide como módulo, intentando evaluar el bundle clásico.', error);
-      const response = await fetch('https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js');
-      const source = await response.text();
-      ctx.eval(source);
+    const response = await fetch(scriptUrl);
+    const source = await response.text();
+    if (lastError) {
+      console.warn('Fallo al inicializar Pyodide con los métodos estándar, evaluando el bundle clásico.', lastError);
     }
+    ctx.eval(source);
   }
 }
 
