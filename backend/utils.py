@@ -3,6 +3,9 @@ from __future__ import annotations
 """Miscellaneous helper functions used across the GUI."""
 
 from typing import Callable, Iterable, List, Optional, Tuple
+import json
+import re
+from pathlib import Path
 import re
 import pretty_midi
 
@@ -96,6 +99,43 @@ def normalise_bars(text: str) -> str:
     return "\n".join(lines)
 
 
+_REPLACEMENTS_CACHE: Optional[List[Tuple[re.Pattern, str]]] = None
+
+
+def _load_replacements() -> List[Tuple[re.Pattern, str]]:
+    global _REPLACEMENTS_CACHE
+    if _REPLACEMENTS_CACHE is not None:
+        return _REPLACEMENTS_CACHE
+
+    root = Path(__file__).resolve().parent.parent
+    replacements_path = root / "shared" / "chord_replacements.json"
+    data = json.loads(replacements_path.read_text(encoding="utf-8"))
+    compiled: List[Tuple[re.Pattern, str]] = []
+    for entry in data:
+        flags = 0
+        for flag in entry.get("flags", ""):
+            if flag == "i":
+                flags |= re.IGNORECASE
+            elif flag == "m":
+                flags |= re.MULTILINE
+        pattern = re.compile(entry["pattern"], flags)
+        def _replace(match: re.Match[str]) -> str:
+            digits = match.group(1)
+            group_id = digits[0]
+            suffix = digits[1:]
+            return f"\\g<{group_id}>{suffix}"
+
+        replacement = re.sub(r"\$(\d+)", _replace, entry["replacement"])
+        compiled.append((pattern, replacement))
+
+    _REPLACEMENTS_CACHE = compiled
+    return compiled
+
+
 def clean_tokens(txt: str) -> str:
-    """Return *txt* unchanged. Placeholder for future logic."""
-    return txt
+    """Normalise chord symbols according to shared replacement rules."""
+
+    result = txt
+    for pattern, replacement in _load_replacements():
+        result = pattern.sub(replacement, result)
+    return result

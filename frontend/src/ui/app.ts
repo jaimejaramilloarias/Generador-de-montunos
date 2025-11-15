@@ -344,7 +344,7 @@ async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefine
   }
   try {
     const [generator, audio] = await Promise.all([getGeneratorModule(), getAudioModule()]);
-    const result = generator.generateMontuno(state);
+    const result = await generator.generateMontuno(state);
     await audio.loadSequence(result.events, result.bpm);
     resetPlayback();
     setGenerated(result);
@@ -490,12 +490,19 @@ function renderSummary(state: AppState, container: HTMLDivElement): void {
     return;
   }
   const { generated } = state;
+  const references = generated.referenceFiles.map((file) => file.split('/').pop() ?? file);
+  const referencesHtml = references.length
+    ? `<p><strong>Plantillas base:</strong> ${references.join(', ')}</p>`
+    : '';
   container.innerHTML = `
     <p><strong>Compases:</strong> ${generated.lengthBars}</p>
     <p><strong>Tempo:</strong> ${generated.bpm} bpm</p>
     <p><strong>Duración estimada:</strong> ${generated.durationSeconds.toFixed(2)} s</p>
-    <p><strong>Variación:</strong> ${state.variation}</p>
-    <p><strong>Clave:</strong> ${state.clave}</p>
+    <p><strong>Modo resultante:</strong> ${generated.modoTag}</p>
+    <p><strong>Clave resultante:</strong> ${generated.claveTag}</p>
+    <p><strong>Variación seleccionada:</strong> ${state.variation}</p>
+    <p><strong>Clave seleccionada:</strong> ${state.clave}</p>
+    ${referencesHtml}
   `;
 }
 

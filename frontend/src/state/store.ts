@@ -107,19 +107,29 @@ function buildChords(
   progressionInput: string,
   base: Pick<AppState, 'modoDefault' | 'armonizacionDefault' | 'inversionDefault' | 'chords'>
 ): { chords: ChordConfig[]; errors: string[] } {
-  const parsed = parseProgression(progressionInput);
+  const parsed = parseProgression(progressionInput, { armonizacionDefault: base.armonizacionDefault });
   const previous = base.chords;
   const chords = parsed.chords.map((chord, index) => {
     const prev = previous[index];
+    const armonizacion = chord.armonizacion ?? prev?.armonizacion ?? base.armonizacionDefault;
+    const inversion =
+      chord.forcedInversion !== undefined
+        ? chord.forcedInversion
+        : prev?.inversion ?? base.inversionDefault;
     if (prev && prev.name === chord.name) {
-      return { ...prev, index };
+      return {
+        ...prev,
+        index,
+        armonizacion,
+        inversion,
+      } satisfies ChordConfig;
     }
     return {
       index,
       name: chord.name,
       modo: base.modoDefault,
-      armonizacion: base.armonizacionDefault,
-      inversion: base.inversionDefault,
+      armonizacion,
+      inversion,
     } satisfies ChordConfig;
   });
   return { chords, errors: parsed.errors };
