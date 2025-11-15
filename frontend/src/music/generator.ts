@@ -1,63 +1,89 @@
+import { Midi } from '@tonejs/midi';
+import { applyChordReplacements } from './chordNormalizer';
+import { generateMontunoRaw } from './bridge';
 import type { AppState, GenerationResult, NoteEvent } from '../types';
-import { buildVoiceLayout } from './chords';
-import { getPattern, getPatternLengthBeats } from './patterns';
+import { normaliseProgressionText } from '../utils/progression';
 
-export function generateMontuno(state: AppState): GenerationResult {
-  if (!state.chords.length) {
-    throw new Error('Ingresa al menos un acorde para generar el montuno.');
-  }
+const REFERENCE_ROOT = 'backend/reference_midi_loops';
 
-  const patternLength = getPatternLengthBeats();
-  const rng = createRng(state.seed ?? undefined);
+export async function generateMontuno(state: AppState): Promise<GenerationResult> {
+  const baseUrl = typeof import.meta.env.BASE_URL === 'string' ? import.meta.env.BASE_URL : '/';
+  const seed = typeof state.seed === 'number' && Number.isFinite(state.seed) ? state.seed : null;
+  const progressionNormalised = applyChordReplacements(normaliseProgressionText(state.progressionInput));
+  const chords = state.chords.map((chord) => ({
+    index: chord.index,
+    modo: chord.modo,
+    armonizacion: chord.armonizacion,
+    inversion: chord.inversion ?? null,
+  }));
+
+  const raw = await generateMontunoRaw(
+    {
+      progression: progressionNormalised,
+      clave: state.clave,
+      modoDefault: state.modoDefault,
+      armonizacionDefault: state.armonizacionDefault,
+      variation: state.variation,
+      inversionDefault: state.inversionDefault,
+      bpm: state.bpm,
+      seed,
+      chords,
+      referenceRoot: REFERENCE_ROOT,
+    },
+    baseUrl
+  );
+
+  const midiData = base64ToUint8Array(raw.midi_base64);
+  const buffer = midiData.buffer.slice(midiData.byteOffset, midiData.byteOffset + midiData.byteLength);
+  const midi = new Midi(buffer);
+  const ppq = midi.header.ppq || 480;
   const events: NoteEvent[] = [];
-  let beatOffset = 0;
 
-  state.chords.forEach((chord) => {
-    const pattern = getPattern(chord.modo, state.variation);
-    const voices = buildVoiceLayout(chord.name, chord.inversion, chord.armonizacion);
-    pattern.forEach((step) => {
-      const jitter = (rng() - 0.5) * 0.1;
-      const velocityScale = clamp(step.velocity * (1 + jitter), 0.2, 1);
-      const time = beatOffset + step.time;
-      const duration = Math.max(0.25, step.duration - Math.abs(jitter) * 0.1);
-      step.roles.forEach((role) => {
-        const midi = voices[role];
-        if (!midi) {
-          return;
-        }
-        events.push({
-          time,
-          duration,
-          midi: Math.round(midi),
-          velocity: velocityScale,
-        });
+  midi.tracks.forEach((track) => {
+    track.notes.forEach((note) => {
+      if (note.midi <= 0) {
+        return;
+      }
+      const timeBeats = note.ticks / ppq;
+      const durationBeats = note.durationTicks / ppq;
+      events.push({
+        time: timeBeats,
+        duration: durationBeats,
+        midi: note.midi,
+        velocity: note.velocity,
       });
     });
-    beatOffset += patternLength;
   });
 
-  events.sort((a, b) => a.time - b.time);
-  const lengthBars = Math.max(1, Math.ceil(beatOffset / 4));
-  const secondsPerBeat = 60 / state.bpm;
-  const durationBeats = events.reduce((max, event) => Math.max(max, event.time + event.duration), 0);
-  const durationSeconds = durationBeats * secondsPerBeat;
+  events.sort((a, b) => {
+    if (a.time === b.time) {
+      return a.midi - b.midi;
+    }
+    return a.time - b.time;
+  });
 
-  return { events, lengthBars, bpm: state.bpm, durationSeconds } satisfies GenerationResult;
+  const secondsPerEighth = 60 / state.bpm / 2;
+  const durationSeconds = raw.max_eighths * secondsPerEighth;
+  const lengthBars = Math.max(1, Math.ceil(raw.max_eighths / 8));
+
+  return {
+    events,
+    lengthBars,
+    bpm: state.bpm,
+    durationSeconds,
+    midiData,
+    modoTag: raw.modo_tag,
+    claveTag: raw.clave_tag,
+    maxEighths: raw.max_eighths,
+    referenceFiles: raw.reference_files,
+  } satisfies GenerationResult;
 }
 
-function createRng(seed?: number | null): () => number {
-  if (seed === undefined || seed === null || Number.isNaN(seed)) {
-    return Math.random;
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = globalThis.atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i += 1) {
+    bytes[i] = binaryString.charCodeAt(i);
   }
-  let t = seed >>> 0;
-  return () => {
-    t += 0x6d2b79f5;
-    let x = Math.imul(t ^ (t >>> 15), t | 1);
-    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
+  return bytes;
 }

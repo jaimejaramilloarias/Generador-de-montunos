@@ -40,6 +40,11 @@ export interface GenerationResult {
   lengthBars: number;
   bpm: number;
   durationSeconds: number;
+  midiData: Uint8Array;
+  modoTag: string;
+  claveTag: string;
+  maxEighths: number;
+  referenceFiles: string[];
 }
 
 export interface NoteEvent {
@@ -65,4 +70,6 @@ export interface ParsedChord {
   name: string;
   raw: string;
   index: number;
+  armonizacion?: Armonizacion;
+  forcedInversion?: Inversion | null;
 }
