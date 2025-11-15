@@ -1,6 +1,8 @@
 import { Midi } from '@tonejs/midi';
 import { applyChordReplacements } from './chordNormalizer';
 import { generateMontunoRaw } from './bridge';
+import type { RawGenerationResult } from './bridge';
+import { FALLBACK_RAW_RESULT } from './fallbackResult';
 import type { AppState, GenerationResult, NoteEvent } from '../types';
 import { normaliseProgressionText } from '../utils/progression';
 
@@ -17,21 +19,31 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
     inversion: chord.inversion ?? null,
   }));
 
-  const raw = await generateMontunoRaw(
-    {
-      progression: progressionNormalised,
-      clave: state.clave,
-      modoDefault: state.modoDefault,
-      armonizacionDefault: state.armonizacionDefault,
-      variation: state.variation,
-      inversionDefault: state.inversionDefault,
-      bpm: state.bpm,
-      seed,
-      chords,
-      referenceRoot: REFERENCE_ROOT,
-    },
-    baseUrl
-  );
+  let raw: RawGenerationResult;
+  try {
+    raw = await generateMontunoRaw(
+      {
+        progression: progressionNormalised,
+        clave: state.clave,
+        modoDefault: state.modoDefault,
+        armonizacionDefault: state.armonizacionDefault,
+        variation: state.variation,
+        inversionDefault: state.inversionDefault,
+        bpm: state.bpm,
+        seed,
+        chords,
+        referenceRoot: REFERENCE_ROOT,
+      },
+      baseUrl
+    );
+  } catch (error) {
+    console.warn('Fallo al generar el montuno con Pyodide, usando resultado de respaldo.', error);
+    raw = {
+      ...FALLBACK_RAW_RESULT,
+      modo_tag: `${state.modoDefault} (respaldo)`,
+      clave_tag: `${state.clave} (respaldo)`,
+    } satisfies RawGenerationResult;
+  }
 
   const midiData = base64ToUint8Array(raw.midi_base64);
   const buffer = midiData.buffer.slice(midiData.byteOffset, midiData.byteOffset + midiData.byteLength);

@@ -42,6 +42,38 @@ let pyodideReady: Promise<PyodideInterface> | null = null;
 let webGenerateFn: WebGenerateFn | null = null;
 const loadedReferenceFiles = new Set<string>();
 
+type PyodideLoaderModule = {
+  loadPyodide: (options: { indexURL: string }) => Promise<PyodideInterface>;
+};
+
+async function ensurePyodideLoader(): Promise<void> {
+  if (ctx.loadPyodide) {
+    return;
+  }
+
+  if (typeof ctx.importScripts === 'function') {
+    try {
+      ctx.importScripts('https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js');
+    } catch (error) {
+      console.warn('Fallo al cargar Pyodide mediante importScripts, intentando con módulo ESM.', error);
+    }
+  }
+
+  if (!ctx.loadPyodide) {
+    try {
+      const module = (await import(
+        /* @vite-ignore */ 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.mjs'
+      )) as PyodideLoaderModule;
+      ctx.loadPyodide = module.loadPyodide;
+    } catch (error) {
+      console.warn('Fallo al importar Pyodide como módulo, intentando evaluar el bundle clásico.', error);
+      const response = await fetch('https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js');
+      const source = await response.text();
+      ctx.eval(source);
+    }
+  }
+}
+
 function ensureDirectory(pyodide: PyodideInterface, path: string): void {
   if (!path) return;
   const parts = path.split('/').filter(Boolean);
@@ -74,9 +106,7 @@ function writeBinaryFile(pyodide: PyodideInterface, path: string, data: Uint8Arr
 async function ensurePyodide(_baseUrl: string): Promise<PyodideInterface> {
   if (!pyodideReady) {
     pyodideReady = (async () => {
-      if (!ctx.loadPyodide) {
-        ctx.importScripts('https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js');
-      }
+      await ensurePyodideLoader();
       const pyodide = await ctx.loadPyodide!({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/' });
       await pyodide.loadPackage(['micropip', 'numpy', 'scipy']);
       await pyodide.runPythonAsync(
