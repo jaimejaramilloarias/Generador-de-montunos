@@ -35,6 +35,13 @@ export function loadPreferences(): PersistedState | null {
     if (parsed.activeProgressionId !== undefined && typeof parsed.activeProgressionId !== 'string') {
       parsed.activeProgressionId = null;
     }
+    if (
+      parsed.selectedMidiOutputId !== undefined &&
+      parsed.selectedMidiOutputId !== null &&
+      typeof parsed.selectedMidiOutputId !== 'string'
+    ) {
+      parsed.selectedMidiOutputId = null;
+    }
     return parsed;
   } catch (error) {
     console.warn('No se pudieron cargar las preferencias guardadas.', error);
@@ -56,6 +63,7 @@ export function savePreferences(state: AppState): void {
     bpm: state.bpm,
     savedProgressions: state.savedProgressions,
     activeProgressionId: state.activeProgressionId,
+    selectedMidiOutputId: state.selectedMidiOutputId,
   };
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));

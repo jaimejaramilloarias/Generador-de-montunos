@@ -297,6 +297,23 @@ def _arm_decimas_intervalos(
                     target_int = 13
                 elif suf in ("7(b9)", "+7(b9)", "7(b5)b9", "7sus4(b9)"):
                     target_int = ints[4]
+                elif suf in {
+                    "7(9)",
+                    "7(13)",
+                    "9",
+                    "11",
+                    "13",
+                    "∆9",
+                    "∆11",
+                    "∆13",
+                    "m9",
+                    "m11",
+                    "m13",
+                    "m7(9)",
+                    "m7(11)",
+                    "m7(13)",
+                }:
+                    target_int = ints[4]
                 else:
                     target_int = 2
         else:
@@ -430,6 +447,23 @@ def _arm_treceavas_intervalos(
                 if suf == "m7(b5)":
                     target_int = 13
                 elif suf in ("7(b9)", "+7(b9)", "7(b5)b9", "7sus4(b9)"):
+                    target_int = ints[4]
+                elif suf in {
+                    "7(9)",
+                    "7(13)",
+                    "9",
+                    "11",
+                    "13",
+                    "∆9",
+                    "∆11",
+                    "∆13",
+                    "m9",
+                    "m11",
+                    "m13",
+                    "m7(9)",
+                    "m7(11)",
+                    "m7(13)",
+                }:
                     target_int = ints[4]
                 else:
                     target_int = 2
@@ -586,6 +620,23 @@ def generar_notas_mixtas(
                     if suf == "m7(b5)":
                         target_int = 13
                     elif suf in ("7(b9)", "+7(b9)", "7(b5)b9", "7sus4(b9)"):
+                        target_int = ints[4]
+                    elif suf in {
+                        "7(9)",
+                        "7(13)",
+                        "9",
+                        "11",
+                        "13",
+                        "∆9",
+                        "∆11",
+                        "∆13",
+                        "m9",
+                        "m11",
+                        "m13",
+                        "m7(9)",
+                        "m7(11)",
+                        "m7(13)",
+                    }:
                         target_int = ints[4]
                     else:
                         target_int = 2

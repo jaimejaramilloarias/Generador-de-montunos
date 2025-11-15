@@ -199,6 +199,33 @@ body {
   font-size: 1.2rem;
 }
 
+.midi-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.midi-controls select {
+  flex: 1 1 220px;
+  min-width: 200px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(8, 20, 44, 0.85);
+  color: #f7faff;
+}
+
+.midi-controls select:disabled {
+  opacity: 0.6;
+}
+
+.midi-status {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: rgba(235, 244, 255, 0.75);
+}
+
 .panel__section-header p {
   margin: 0;
   color: rgba(255, 255, 255, 0.65);

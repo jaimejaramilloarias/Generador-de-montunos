@@ -1,5 +1,11 @@
 [
   { "pattern": "([A-G][b#]?)(mmaj7)", "replacement": "$1m∆", "flags": "gi" },
+  { "pattern": "([A-G][b#]?)(maj13)", "replacement": "$1∆13", "flags": "gi" },
+  { "pattern": "([A-G][b#]?)(maj11)", "replacement": "$1∆11", "flags": "gi" },
+  { "pattern": "([A-G][b#]?)(maj9)", "replacement": "$1∆9", "flags": "gi" },
+  { "pattern": "([A-G][b#]?)(M13)", "replacement": "$1∆13", "flags": "gi" },
+  { "pattern": "([A-G][b#]?)(M11)", "replacement": "$1∆11", "flags": "gi" },
+  { "pattern": "([A-G][b#]?)(M9)", "replacement": "$1∆9", "flags": "gi" },
   { "pattern": "([A-G][b#]?)(mmaj9)", "replacement": "$1m∆", "flags": "gi" },
   { "pattern": "([A-G][b#]?)(mmaj)", "replacement": "$1m∆", "flags": "gi" },
   { "pattern": "([A-G][b#]?)(maj7[(]b5[)])", "replacement": "$1∆(b5)", "flags": "gi" },
