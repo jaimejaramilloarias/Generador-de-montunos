@@ -15,6 +15,7 @@ describe('parseProgression', () => {
   it('detecta acordes válidos', () => {
     const result = parseProgression('Cmaj7 F7 | G7', { armonizacionDefault: 'Octavas' });
     expect(result.chords.map((c) => c.name)).toEqual(['C∆', 'F7', 'G7']);
+    expect(result.chords.every((c) => c.isRecognized)).toBe(true);
     expect(result.errors).toHaveLength(0);
   });
 
@@ -30,5 +31,17 @@ describe('parseProgression', () => {
     expect(result.chords[0]?.forcedInversion).toBeUndefined();
     expect(result.chords[1]?.armonizacion).toBe('Treceavas');
     expect(result.chords[1]?.forcedInversion).toBe('third');
+  });
+
+  it('interpreta % como repetición del compás anterior', () => {
+    const result = parseProgression('| Bm7 | % |', { armonizacionDefault: 'Octavas' });
+    expect(result.chords.map((c) => c.name)).toEqual(['Bm7', 'Bm7']);
+  });
+
+  it('marca acordes no reconocidos y conserva el cifrado', () => {
+    const result = parseProgression('Cmaj7 Cfoo', { armonizacionDefault: 'Octavas' });
+    expect(result.chords[1]?.name).toBe('Cfoo');
+    expect(result.chords[1]?.isRecognized).toBe(false);
+    expect(result.errors.some((error) => error.includes('Acorde no reconocido'))).toBe(true);
   });
 });

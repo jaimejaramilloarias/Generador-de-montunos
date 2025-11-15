@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Armonizacion, Inversion, ParsedChord } from '../types';
 import { applyChordReplacements } from '../music/chordNormalizer';
+import { isRecognizedChordSymbol } from './chordValidation';
 
 const chordRegex = /^[A-G](?:#|b)?/i;
 
@@ -116,10 +117,16 @@ export function parseProgression(
       const root = match[0].toUpperCase();
       const suffix = chord.slice(match[0].length);
       const normalisedChord = applyChordReplacements(`${root}${suffix}`);
+      const recognized = isRecognizedChordSymbol(normalisedChord);
+      if (!recognized) {
+        errors.push(`Acorde no reconocido en la posición ${chords.length + 1}: “${raw}”`);
+      }
+      const displayName = recognized ? normalisedChord : raw;
       chords.push({
-        name: normalisedChord,
+        name: displayName,
         raw,
         index: chords.length,
+        isRecognized: recognized,
         ...(armonizacion ? { armonizacion } : {}),
         ...(inversion ? { forcedInversion: inversion } : {}),
       });

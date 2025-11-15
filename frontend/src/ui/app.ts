@@ -720,15 +720,35 @@ function renderChordRows(state: AppState, tbody: HTMLTableSectionElement): void 
   });
 }
 
+function applyChordValidityStyles(cell: HTMLTableCellElement, isRecognized: boolean): void {
+  cell.classList.add('chord-cell');
+  if (isRecognized) {
+    cell.classList.remove('chord-cell--invalid');
+    cell.removeAttribute('title');
+  } else {
+    cell.classList.add('chord-cell--invalid');
+    cell.title = 'Cifrado no reconocido';
+  }
+}
+
 function buildChordRow(chord: ChordConfig): HTMLTableRowElement {
   const row = document.createElement('tr');
-  row.innerHTML = `
-    <td>${chord.index + 1}</td>
-    <td>${chord.name}</td>
-    <td></td>
-    <td></td>
-    <td></td>
-  `;
+
+  const indexCell = document.createElement('td');
+  indexCell.textContent = String(chord.index + 1);
+  row.appendChild(indexCell);
+
+  const nameCell = document.createElement('td');
+  nameCell.textContent = chord.name;
+  applyChordValidityStyles(nameCell, chord.isRecognized);
+  row.appendChild(nameCell);
+
+  const modoCell = document.createElement('td');
+  const armonizacionCell = document.createElement('td');
+  const inversionCell = document.createElement('td');
+  row.appendChild(modoCell);
+  row.appendChild(armonizacionCell);
+  row.appendChild(inversionCell);
 
   const modoSelect = createSelect(MODOS, chord.modo, (value) => {
     setChord(chord.index, { modo: value as AppState['modoDefault'] });
@@ -749,9 +769,9 @@ function buildChordRow(chord: ChordConfig): HTMLTableRowElement {
     modoSelect.disabled = true;
   }
 
-  row.children[2].appendChild(modoSelect);
-  row.children[3].appendChild(armonizacionSelect);
-  row.children[4].appendChild(inversionSelect);
+  modoCell.appendChild(modoSelect);
+  armonizacionCell.appendChild(armonizacionSelect);
+  inversionCell.appendChild(inversionSelect);
 
   return row;
 }

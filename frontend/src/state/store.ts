@@ -139,6 +139,7 @@ function buildChords(
         modo: nextModo,
         armonizacion,
         inversion: nextInversion,
+        isRecognized: chord.isRecognized,
       } satisfies ChordConfig;
     }
 
@@ -149,6 +150,7 @@ function buildChords(
       modo: nextModo,
       armonizacion,
       inversion: forcedInversion,
+      isRecognized: chord.isRecognized,
     } satisfies ChordConfig;
   });
   return { chords, errors: parsed.errors };
@@ -242,7 +244,10 @@ export function setSeed(seed: number | null): void {
   updateState({ seed });
 }
 
-export function setChord(index: number, patch: Partial<Omit<ChordConfig, 'index' | 'name'>>): void {
+export function setChord(
+  index: number,
+  patch: Partial<Omit<ChordConfig, 'index' | 'name' | 'isRecognized'>>
+): void {
   const chords = state.chords.map((chord) => {
     if (chord.index !== index) {
       return chord;

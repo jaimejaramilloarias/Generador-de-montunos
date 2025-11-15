@@ -9,6 +9,7 @@ export interface ChordConfig {
   modo: Modo;
   armonizacion: Armonizacion;
   inversion: Inversion | null;
+  isRecognized: boolean;
 }
 
 export interface SavedProgression {
@@ -83,6 +84,7 @@ export interface ParsedChord {
   name: string;
   raw: string;
   index: number;
+  isRecognized: boolean;
   armonizacion?: Armonizacion;
   forcedInversion?: Inversion | null;
 }
