@@ -262,6 +262,7 @@ function buildLayout(): string {
               role="list"
               aria-live="polite"
             ></div>
+            <div id="errors" class="errors" aria-live="assertive"></div>
           </fieldset>
           <fieldset class="panel__section grid">
             <div>
@@ -356,7 +357,6 @@ function buildLayout(): string {
               <button type="button" id="play" class="btn">Reproducir</button>
               <button type="button" id="download" class="btn" disabled>Descargar MIDI</button>
             </div>
-            <div id="errors" class="errors" aria-live="assertive"></div>
           </section>
         </form>
         <aside class="summary" aria-live="polite">
