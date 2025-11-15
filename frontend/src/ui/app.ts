@@ -25,6 +25,7 @@ import {
 import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
 import type { AppState, ChordConfig, GenerationResult, MidiStatus } from '../types';
 import { CHORD_SUFFIX_SUGGESTIONS, getChordSuffixSuggestions } from '../utils/chordAutocomplete';
+import { isExtendedChordName } from '../utils/chords';
 
 type GeneratorModule = typeof import('../music/generator');
 type AudioModule = typeof import('../audio/player');
@@ -735,9 +736,18 @@ function buildChordRow(chord: ChordConfig): HTMLTableRowElement {
   const armonizacionSelect = createSelect(ARMONIZACIONES, chord.armonizacion, (value) => {
     setChord(chord.index, { armonizacion: value as AppState['armonizacionDefault'] });
   });
-  const inversionSelect = createSelect(Object.entries(INVERSIONES).map(([value, label]) => ({ value, label })), chord.inversion, (value) => {
-    setChord(chord.index, { inversion: value as AppState['inversionDefault'] });
+  const inversionOptions = [
+    { value: '', label: 'Automática' },
+    ...Object.entries(INVERSIONES).map(([value, label]) => ({ value, label })),
+  ];
+  const inversionSelect = createSelect(inversionOptions, chord.inversion ?? '', (value) => {
+    setChord(chord.index, { inversion: value === '' ? null : (value as AppState['inversionDefault']) });
   });
+
+  if (isExtendedChordName(chord.name)) {
+    modoSelect.value = 'Extendido';
+    modoSelect.disabled = true;
+  }
 
   row.children[2].appendChild(modoSelect);
   row.children[3].appendChild(armonizacionSelect);

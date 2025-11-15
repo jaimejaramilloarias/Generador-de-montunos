@@ -8,7 +8,7 @@ export interface ChordConfig {
   name: string;
   modo: Modo;
   armonizacion: Armonizacion;
-  inversion: Inversion;
+  inversion: Inversion | null;
 }
 
 export interface SavedProgression {
