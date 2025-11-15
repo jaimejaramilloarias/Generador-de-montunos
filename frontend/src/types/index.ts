@@ -30,6 +30,7 @@ export interface AppState {
   chords: ChordConfig[];
   errors: string[];
   isPlaying: boolean;
+  isGenerating: boolean;
   generated?: GenerationResult;
   savedProgressions: SavedProgression[];
   activeProgressionId: string | null;

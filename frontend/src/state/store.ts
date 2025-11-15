@@ -83,6 +83,7 @@ function createInitialState(): AppState {
     chords: [],
     errors: [],
     isPlaying: false,
+    isGenerating: false,
     generated: undefined,
     savedProgressions,
     activeProgressionId: activeFromPersisted,
@@ -163,6 +164,7 @@ function applyProgression(
     inversionDefault: state.inversionDefault,
     chords: state.chords,
   });
+  const wasGenerating = state.isGenerating;
   let nextActiveId: string | null = state.activeProgressionId;
   if (options && 'activeProgressionId' in options) {
     nextActiveId = options.activeProgressionId ?? null;
@@ -176,6 +178,9 @@ function applyProgression(
     }
   }
   updateState({ progressionInput, chords, errors, generated: undefined, activeProgressionId: nextActiveId });
+  if (wasGenerating) {
+    setIsGenerating(false);
+  }
 }
 
 export function setProgression(progressionInput: string): void {
@@ -236,6 +241,11 @@ export function setErrors(errors: string[]): void {
 
 export function setIsPlaying(isPlaying: boolean): void {
   state = { ...state, isPlaying };
+  emit();
+}
+
+export function setIsGenerating(isGenerating: boolean): void {
+  state = { ...state, isGenerating };
   emit();
 }
 
