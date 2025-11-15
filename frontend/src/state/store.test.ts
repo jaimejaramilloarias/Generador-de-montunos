@@ -60,4 +60,13 @@ describe('state/store saved progressions', () => {
     expect(state.savedProgressions).toHaveLength(0);
     expect(state.activeProgressionId).toBeNull();
   });
+
+  it('detecta acordes extendidos y fuerza el modo extendido', () => {
+    setProgression('Cmaj9 | Dm7(9) G7');
+    const state = getState();
+    expect(state.chords[0]?.modo).toBe('Extendido');
+    expect(state.chords[0]?.inversion).toBeNull();
+    expect(state.chords[1]?.modo).toBe('Extendido');
+    expect(state.chords[2]?.modo).toBe('Tradicional');
+  });
 });

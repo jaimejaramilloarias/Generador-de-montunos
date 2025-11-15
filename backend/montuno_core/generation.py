@@ -10,7 +10,7 @@ import pretty_midi
 
 from .. import midi_utils, midi_utils_tradicional, salsa
 from ..modos import MODOS_DISPONIBLES
-from ..utils import apply_manual_edits, limpiar_inversion
+from ..utils import apply_manual_edits, limpiar_inversion, calc_default_inversions
 
 from .config import ClaveConfig, get_clave_tag
 
@@ -52,10 +52,23 @@ def _normalise_optional_sequence(
     values: Optional[Sequence[Optional[str]]],
     length: int,
 ) -> List[Optional[str]]:
-    result = list(values or [])
+    result = [value or None for value in (values or [])]
     if len(result) < length:
         result.extend([None] * (length - len(result)))
     return result[:length]
+
+
+def _is_extended_chord(symbol: str) -> bool:
+    base = symbol.split("/")[0]
+    sufijo = ""
+    for idx, char in enumerate(base):
+        if char.isalpha() and char.upper() in "ABCDEFG" and idx == 0:
+            continue
+        sufijo = base[idx:]
+        break
+    if not sufijo:
+        return False
+    return any(token in sufijo for token in ("9", "11", "13"))
 
 
 def generate_montuno(
@@ -99,6 +112,23 @@ def generate_montuno(
         armonias = _normalise_sequence(armonias_por_indice, armonizacion_default, num_chords)
         inversiones = _normalise_optional_sequence(inversiones_por_indice, num_chords)
 
+        inversion_limpia = limpiar_inversion(inversion)
+
+        default_inversions = calc_default_inversions(
+            asignaciones_all,
+            lambda: inversion_limpia,
+            salsa.get_bass_pitch,
+            salsa._ajustar_rango_flexible,
+            salsa.seleccionar_inversion,
+        )
+
+        for idx, asign in enumerate(asignaciones_all):
+            if not inversiones[idx]:
+                inversiones[idx] = default_inversions[idx]
+
+            if modos[idx] != "Extendido" and _is_extended_chord(asign[0]):
+                modos[idx] = "Extendido"
+
         segmentos: List[_Segment] = []
         start = 0
         modo_actual = modos[0]
@@ -141,7 +171,8 @@ def generate_montuno(
         max_cor = 0
         inst_params: Optional[Tuple[int, bool, str]] = None
         reference_files: List[Path] = []
-        inversion_limpia = limpiar_inversion(inversion)
+        # ``inversion_limpia`` calculated above so the same base inversion is
+        # reused for deterministic default selection.
 
         with TemporaryDirectory() as tmpdir:
             for idx, segmento in enumerate(segmentos):

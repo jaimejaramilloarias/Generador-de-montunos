@@ -12,6 +12,7 @@ import type {
 import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
+import { isExtendedChordName } from '../utils/chords';
 
 const listeners = new Set<(state: AppState) => void>();
 
@@ -119,31 +120,35 @@ function persist(): void {
 
 function buildChords(
   progressionInput: string,
-  base: Pick<AppState, 'modoDefault' | 'armonizacionDefault' | 'inversionDefault' | 'chords'>
+  base: Pick<AppState, 'modoDefault' | 'armonizacionDefault' | 'chords'>
 ): { chords: ChordConfig[]; errors: string[] } {
   const parsed = parseProgression(progressionInput, { armonizacionDefault: base.armonizacionDefault });
   const previous = base.chords;
   const chords = parsed.chords.map((chord, index) => {
     const prev = previous[index];
     const armonizacion = chord.armonizacion ?? prev?.armonizacion ?? base.armonizacionDefault;
-    const inversion =
-      chord.forcedInversion !== undefined
-        ? chord.forcedInversion
-        : prev?.inversion ?? base.inversionDefault;
+    const forcedInversion = chord.forcedInversion ?? null;
+    const isExtended = isExtendedChordName(chord.name);
+
     if (prev && prev.name === chord.name) {
+      const nextInversion = forcedInversion ?? prev.inversion ?? null;
+      const nextModo = isExtended ? 'Extendido' : prev.modo;
       return {
         ...prev,
         index,
+        modo: nextModo,
         armonizacion,
-        inversion,
+        inversion: nextInversion,
       } satisfies ChordConfig;
     }
+
+    const nextModo = isExtended ? 'Extendido' : base.modoDefault;
     return {
       index,
       name: chord.name,
-      modo: base.modoDefault,
+      modo: nextModo,
       armonizacion,
-      inversion,
+      inversion: forcedInversion,
     } satisfies ChordConfig;
   });
   return { chords, errors: parsed.errors };
@@ -174,7 +179,6 @@ function applyProgression(
   const { chords, errors } = buildChords(progressionInput, {
     modoDefault: state.modoDefault,
     armonizacionDefault: state.armonizacionDefault,
-    inversionDefault: state.inversionDefault,
     chords: state.chords,
   });
   const wasGenerating = state.isGenerating;
@@ -201,7 +205,9 @@ export function setProgression(progressionInput: string): void {
 }
 
 export function setDefaultModo(modo: Modo): void {
-  const chords = state.chords.map((chord) => ({ ...chord, modo }));
+  const chords = state.chords.map((chord) =>
+    isExtendedChordName(chord.name) ? chord : { ...chord, modo }
+  );
   updateState({ modoDefault: modo, chords });
 }
 
@@ -211,7 +217,9 @@ export function setDefaultArmonizacion(armonizacion: AppState['armonizacionDefau
 }
 
 export function setDefaultInversion(inversion: Inversion): void {
-  const chords = state.chords.map((chord) => ({ ...chord, inversion }));
+  const chords = state.chords.map((chord) =>
+    chord.inversion === null ? chord : { ...chord, inversion }
+  );
   updateState({ inversionDefault: inversion, chords });
 }
 
@@ -239,7 +247,15 @@ export function setChord(index: number, patch: Partial<Omit<ChordConfig, 'index'
     if (chord.index !== index) {
       return chord;
     }
-    return { ...chord, ...patch };
+    const next: ChordConfig = {
+      ...chord,
+      ...patch,
+      inversion: patch.inversion === undefined ? chord.inversion : patch.inversion,
+    };
+    if (isExtendedChordName(next.name)) {
+      next.modo = 'Extendido';
+    }
+    return next;
   });
   updateState({ chords });
 }
