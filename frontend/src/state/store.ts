@@ -3,13 +3,14 @@ import type {
   ChordConfig,
   GenerationResult,
   Inversion,
+  ManualEditEntry,
   MidiOutputInfo,
   MidiStatus,
   Modo,
   SavedProgression,
   Variacion,
 } from '../types';
-import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
+import { ARMONIZACIONES, CLAVES, INVERSIONES, INVERSION_ORDER, MODOS, VARIACIONES } from '../types/constants';
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
 import { isExtendedChordName } from '../utils/chords';
@@ -56,6 +57,15 @@ function createDefaultProgressionName(current: SavedProgression[]): string {
   return candidate;
 }
 
+function isValidManualEdit(entry: ManualEditEntry): boolean {
+  return (
+    (entry.type === 'modify' || entry.type === 'add' || entry.type === 'delete') &&
+    Number.isFinite(entry.startBeats) &&
+    Number.isFinite(entry.durationBeats) &&
+    Number.isFinite(entry.pitch)
+  );
+}
+
 function detectInitialMidiStatus(): MidiStatus {
   if (typeof navigator === 'undefined') {
     return 'unavailable';
@@ -92,6 +102,9 @@ function createInitialState(): AppState {
     bpm: persisted?.bpm ?? 120,
     seed: null,
     chords: [],
+    manualEdits: Array.isArray(persisted?.manualEdits)
+      ? persisted.manualEdits.filter((edit) => isValidManualEdit(edit as ManualEditEntry))
+      : [],
     errors: [],
     isPlaying: false,
     isGenerating: false,
@@ -172,6 +185,12 @@ function updateState(partial: Partial<AppState>): void {
   persist();
 }
 
+function markDirty(): void {
+  if (state.generated) {
+    updateState({ generated: undefined });
+  }
+}
+
 function applyProgression(
   progressionInput: string,
   options?: {
@@ -211,11 +230,13 @@ export function setDefaultModo(modo: Modo): void {
     isExtendedChordName(chord.name) ? chord : { ...chord, modo }
   );
   updateState({ modoDefault: modo, chords });
+  markDirty();
 }
 
 export function setDefaultArmonizacion(armonizacion: AppState['armonizacionDefault']): void {
   const chords = state.chords.map((chord) => ({ ...chord, armonizacion }));
   updateState({ armonizacionDefault: armonizacion, chords });
+  markDirty();
 }
 
 export function setDefaultInversion(inversion: Inversion): void {
@@ -223,10 +244,12 @@ export function setDefaultInversion(inversion: Inversion): void {
     chord.inversion === null ? chord : { ...chord, inversion }
   );
   updateState({ inversionDefault: inversion, chords });
+  markDirty();
 }
 
 export function setVariation(variation: Variacion): void {
   updateState({ variation });
+  markDirty();
 }
 
 export function setClave(clave: string): void {
@@ -234,14 +257,17 @@ export function setClave(clave: string): void {
     return;
   }
   updateState({ clave });
+  markDirty();
 }
 
 export function setBpm(bpm: number): void {
   updateState({ bpm });
+  markDirty();
 }
 
 export function setSeed(seed: number | null): void {
   updateState({ seed });
+  markDirty();
 }
 
 export function setChord(
@@ -263,6 +289,39 @@ export function setChord(
     return next;
   });
   updateState({ chords });
+  markDirty();
+}
+
+export function shiftAllInversions(delta: number): void {
+  const chords = state.chords.map((chord) => {
+    const current = chord.inversion ?? state.inversionDefault;
+    const index = INVERSION_ORDER.indexOf(current);
+    if (index === -1) {
+      return chord;
+    }
+    const next = INVERSION_ORDER[(index + delta + INVERSION_ORDER.length) % INVERSION_ORDER.length];
+    return { ...chord, inversion: next } satisfies ChordConfig;
+  });
+  updateState({ chords });
+  markDirty();
+}
+
+export function addManualEdit(): void {
+  const next: ManualEditEntry = { type: 'modify', startBeats: 0, durationBeats: 1, pitch: 60 };
+  updateState({ manualEdits: [next, ...state.manualEdits] });
+  markDirty();
+}
+
+export function updateManualEdit(index: number, patch: Partial<ManualEditEntry>): void {
+  const manualEdits = state.manualEdits.map((entry, idx) => (idx === index ? { ...entry, ...patch } : entry));
+  updateState({ manualEdits });
+  markDirty();
+}
+
+export function removeManualEdit(index: number): void {
+  const manualEdits = state.manualEdits.filter((_, idx) => idx !== index);
+  updateState({ manualEdits });
+  markDirty();
 }
 
 export function setGenerated(result: GenerationResult | undefined): void {

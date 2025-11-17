@@ -2,6 +2,7 @@ export type Modo = 'Tradicional' | 'Extendido' | 'Salsa';
 export type Armonizacion = 'Octavas' | 'Doble octava' | 'Décimas' | 'Treceavas';
 export type Variacion = 'A' | 'B' | 'C' | 'D';
 export type Inversion = 'root' | 'third' | 'fifth' | 'seventh';
+export type ManualEditType = 'modify' | 'add' | 'delete';
 
 export interface ChordConfig {
   index: number;
@@ -10,6 +11,13 @@ export interface ChordConfig {
   armonizacion: Armonizacion;
   inversion: Inversion | null;
   isRecognized: boolean;
+}
+
+export interface ManualEditEntry {
+  type: ManualEditType;
+  startBeats: number;
+  durationBeats: number;
+  pitch: number;
 }
 
 export interface SavedProgression {
@@ -29,6 +37,7 @@ export interface AppState {
   bpm: number;
   seed: number | null;
   chords: ChordConfig[];
+  manualEdits: ManualEditEntry[];
   errors: string[];
   isPlaying: boolean;
   isGenerating: boolean;
@@ -67,6 +76,7 @@ export interface PersistedState {
   variation: Variacion;
   inversionDefault: Inversion;
   bpm: number;
+  manualEdits?: ManualEditEntry[];
   savedProgressions?: SavedProgression[];
   activeProgressionId?: string | null;
   selectedMidiOutputId?: string | null;

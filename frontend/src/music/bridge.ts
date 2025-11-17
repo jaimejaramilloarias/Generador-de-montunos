@@ -16,6 +16,12 @@ export interface RawGenerationInput {
     inversion: AppState['inversionDefault'] | null;
   }[];
   referenceRoot: string;
+  manualEdits: {
+    type: 'modify' | 'add' | 'delete';
+    start: number;
+    end: number;
+    pitch: number;
+  }[];
 }
 
 export interface RawGenerationResult {
