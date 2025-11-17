@@ -1,5 +1,6 @@
 export type Modo = 'Tradicional' | 'Extendido' | 'Salsa';
 export type Armonizacion = 'Octavas' | 'Doble octava' | 'Décimas' | 'Treceavas';
+export type Octavacion = 'Original' | 'Octava arriba' | 'Octava abajo';
 export type Variacion = 'A' | 'B' | 'C' | 'D';
 export type Inversion = 'root' | 'third' | 'fifth' | 'seventh';
 export type ManualEditType = 'modify' | 'add' | 'delete';
@@ -9,6 +10,7 @@ export interface ChordConfig {
   name: string;
   modo: Modo;
   armonizacion: Armonizacion;
+  octavacion: Octavacion;
   inversion: Inversion | null;
   isRecognized: boolean;
 }
@@ -37,6 +39,7 @@ export interface AppState {
   clave: string;
   modoDefault: Modo;
   armonizacionDefault: Armonizacion;
+  octavacionDefault: Octavacion;
   variation: Variacion;
   inversionDefault: Inversion;
   bpm: number;
@@ -78,6 +81,7 @@ export interface PersistedState {
   clave: string;
   modoDefault: Modo;
   armonizacionDefault: Armonizacion;
+  octavacionDefault: Octavacion;
   variation: Variacion;
   inversionDefault: Inversion;
   bpm: number;

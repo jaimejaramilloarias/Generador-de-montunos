@@ -32,6 +32,7 @@ class _Segment:
     assignments: List[Tuple[str, List[int], str, Optional[str]]]
     start_eighth: int
     chord_indices: List[int]
+    octavaciones: List[str]
 
 
 _DEF_VARIATIONS = ["A", "B", "C", "D"]
@@ -82,6 +83,8 @@ def generate_montuno(
     modo_por_acorde: Optional[Sequence[str]] = None,
     armonias_por_indice: Optional[Sequence[str]] = None,
     armonizacion_default: str,
+    octavas_por_indice: Optional[Sequence[str]] = None,
+    octavacion_default: str = "Original",
     variacion: str,
     inversion: str,
     reference_root: Path,
@@ -113,6 +116,9 @@ def generate_montuno(
         num_chords = len(asignaciones_all)
         modos = _normalise_sequence(modo_por_acorde, modo_default, num_chords)
         armonias = _normalise_sequence(armonias_por_indice, armonizacion_default, num_chords)
+        octavaciones = _normalise_sequence(
+            octavas_por_indice, octavacion_default, num_chords
+        )
         inversiones = _normalise_optional_sequence(inversiones_por_indice, num_chords)
 
         inversion_limpia = limpiar_inversion(inversion)
@@ -143,6 +149,7 @@ def generate_montuno(
                         _build_segment_assignments(asignaciones_all[start:idx]),
                         asignaciones_all[start][1][0],
                         list(range(start, idx)),
+                        octavaciones[start:idx],
                     )
                 )
                 start = idx
@@ -153,6 +160,7 @@ def generate_montuno(
                 _build_segment_assignments(asignaciones_all[start:num_chords]),
                 asignaciones_all[start][1][0],
                 list(range(start, num_chords)),
+                octavaciones[start:num_chords],
             )
         )
 
@@ -202,6 +210,9 @@ def generate_montuno(
                 asign_seg = [tuple(a) for a in segmento.assignments]
                 kwargs = {"asignaciones_custom": asign_seg}
                 inv_seg = [inversiones[i] for i in segmento.chord_indices]
+                oct_seg = [octavaciones[i] for i in segmento.chord_indices]
+                kwargs["octavacion_default"] = octavacion_default
+                kwargs["octavaciones_custom"] = oct_seg
 
                 if segmento.mode == "Salsa":
                     if any(inv_seg):

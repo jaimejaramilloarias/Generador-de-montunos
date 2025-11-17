@@ -10,7 +10,15 @@ import type {
   SavedProgression,
   Variacion,
 } from '../types';
-import { ARMONIZACIONES, CLAVES, INVERSIONES, INVERSION_ORDER, MODOS, VARIACIONES } from '../types/constants';
+import {
+  ARMONIZACIONES,
+  CLAVES,
+  INVERSIONES,
+  INVERSION_ORDER,
+  MODOS,
+  OCTAVACIONES,
+  VARIACIONES,
+} from '../types/constants';
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
 import { isExtendedChordName } from '../utils/chords';
@@ -94,6 +102,10 @@ function createInitialState(): AppState {
       persisted?.armonizacionDefault && ARMONIZACIONES.includes(persisted.armonizacionDefault)
         ? persisted.armonizacionDefault
         : 'Octavas',
+    octavacionDefault:
+      persisted?.octavacionDefault && OCTAVACIONES.includes(persisted.octavacionDefault)
+        ? persisted.octavacionDefault
+        : 'Original',
     variation:
       persisted?.variation && VARIACIONES.includes(persisted.variation) ? persisted.variation : VARIACIONES[0],
     inversionDefault:
@@ -134,13 +146,14 @@ function persist(): void {
 
 function buildChords(
   progressionInput: string,
-  base: Pick<AppState, 'modoDefault' | 'armonizacionDefault' | 'chords'>
+  base: Pick<AppState, 'modoDefault' | 'armonizacionDefault' | 'octavacionDefault' | 'chords'>
 ): { chords: ChordConfig[]; errors: string[] } {
   const parsed = parseProgression(progressionInput, { armonizacionDefault: base.armonizacionDefault });
   const previous = base.chords;
   const chords = parsed.chords.map((chord, index) => {
     const prev = previous[index];
     const armonizacion = chord.armonizacion ?? prev?.armonizacion ?? base.armonizacionDefault;
+    const octavacion = prev?.octavacion ?? base.octavacionDefault;
     const forcedInversion = chord.forcedInversion ?? null;
     const isExtended = isExtendedChordName(chord.name);
 
@@ -152,6 +165,7 @@ function buildChords(
         index,
         modo: nextModo,
         armonizacion,
+        octavacion,
         inversion: nextInversion,
         isRecognized: chord.isRecognized,
       } satisfies ChordConfig;
@@ -163,6 +177,7 @@ function buildChords(
       name: chord.name,
       modo: nextModo,
       armonizacion,
+      octavacion: base.octavacionDefault,
       inversion: forcedInversion,
       isRecognized: chord.isRecognized,
     } satisfies ChordConfig;
@@ -201,6 +216,7 @@ function applyProgression(
   const { chords, errors } = buildChords(progressionInput, {
     modoDefault: state.modoDefault,
     armonizacionDefault: state.armonizacionDefault,
+    octavacionDefault: state.octavacionDefault,
     chords: state.chords,
   });
   const wasGenerating = state.isGenerating;
@@ -237,6 +253,12 @@ export function setDefaultModo(modo: Modo): void {
 export function setDefaultArmonizacion(armonizacion: AppState['armonizacionDefault']): void {
   const chords = state.chords.map((chord) => ({ ...chord, armonizacion }));
   updateState({ armonizacionDefault: armonizacion, chords });
+  markDirty();
+}
+
+export function setDefaultOctavacion(octavacion: AppState['octavacionDefault']): void {
+  const chords = state.chords.map((chord) => ({ ...chord, octavacion }));
+  updateState({ octavacionDefault: octavacion, chords });
   markDirty();
 }
 

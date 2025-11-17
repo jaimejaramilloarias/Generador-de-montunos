@@ -517,17 +517,15 @@ _ARMONIZADORES = {
 }
 
 
-def _ajustar_salto(prev_pitch: Optional[int], pitch: int) -> int:
-    """Return ``pitch`` transposed by octaves so the leap from ``prev_pitch``
-    is less than an octave."""
+def _offset_octavacion(label: str) -> int:
+    """Return the octave shift in semitones indicated by ``label``."""
 
-    if prev_pitch is None:
-        return pitch
-    while pitch - prev_pitch >= 12:
-        pitch -= 12
-    while prev_pitch - pitch >= 12:
-        pitch += 12
-    return pitch
+    etiqueta = label.lower().strip()
+    if etiqueta == "octava arriba":
+        return 12
+    if etiqueta == "octava abajo":
+        return -12
+    return 0
 
 
 def generar_notas_mixtas(
@@ -536,6 +534,7 @@ def generar_notas_mixtas(
     asignaciones: List[Tuple[str, List[int], str]],
     grid_seg: float,
     *,
+    octavaciones: Optional[List[str]] = None,
     debug: bool = False,
 ) -> List[pretty_midi.Note]:
     """Generate notes applying per-chord harmonisation.
@@ -570,9 +569,11 @@ def generar_notas_mixtas(
         )
 
     contadores: Dict[int, int] = {}
-    offsets: Dict[int, int] = {}
-    bajo_anterior: Optional[int] = None
-    arm_anterior: Optional[str] = None
+    offset_por_idx: Dict[int, int] = {}
+
+    if octavaciones:
+        for idx, etiqueta in enumerate(octavaciones):
+            offset_por_idx[idx] = _offset_octavacion(etiqueta or "")
     resultado: List[pretty_midi.Note] = []
 
     for pos in posiciones:
@@ -671,21 +672,7 @@ def generar_notas_mixtas(
             else:
                 notas = [base_pitch]
 
-        offset = offsets.get(idx, 0)
-        if paso == 0:
-            bajo = min(notas)
-            if arm != arm_anterior:
-                ajustado = _ajustar_salto(bajo_anterior, bajo)
-                offset = ajustado - bajo
-                offsets[idx] = offset
-                bajo_anterior = ajustado
-                arm_anterior = arm
-            else:
-                offsets[idx] = offset
-                bajo_anterior = bajo + offset
-                arm_anterior = arm
-        else:
-            offset = offsets.get(idx, 0)
+        offset = offset_por_idx.get(idx, 0)
 
         if debug and paso == 0:
             logger.debug(
@@ -783,6 +770,7 @@ def exportar_montuno(
     debug: bool = False,
     return_pm: bool = False,
     aleatorio: bool = False,
+    octavaciones: Optional[List[str]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Generate a new MIDI file with the given voicings.
 
@@ -835,7 +823,12 @@ def exportar_montuno(
     limite = limite_cor * grid
 
     nuevas_notas = generar_notas_mixtas(
-        posiciones, voicings, asignaciones, grid, debug=debug
+        posiciones,
+        voicings,
+        asignaciones,
+        grid,
+        octavaciones=octavaciones,
+        debug=debug,
     )
 
     # Avoid overlapping notes at the same pitch which can cause MIDI

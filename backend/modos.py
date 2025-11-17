@@ -31,6 +31,7 @@ def _exportar_montuno_extendido(
     return_pm: bool = False,
     aleatorio: bool = False,
     debug: bool = False,
+    octavaciones: Optional[List[str]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Wrap :func:`midi_utils.exportar_montuno` adding ``return_pm`` support."""
 
@@ -43,6 +44,7 @@ def _exportar_montuno_extendido(
         armonizacion,
         inicio_cor=inicio_cor,
         aleatorio=aleatorio,
+        octavaciones=octavaciones,
         debug=debug,
     )
     return pretty_midi.PrettyMIDI(str(output)) if return_pm else None
@@ -62,6 +64,8 @@ def _montuno_generico(
     aleatorio: bool = False,
     armonizaciones_custom: Optional[List[str]] = None,
     asignaciones_custom: Optional[List[Tuple[str, List[int], str]]] = None,
+    octavacion_default: Optional[str] = None,
+    octavaciones_custom: Optional[List[str]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     if asignaciones_custom is None:
         asignaciones, compases = procesar_progresion_en_grupos(
@@ -74,6 +78,7 @@ def _montuno_generico(
             if asignaciones
             else 0
         )
+    octavaciones = octavaciones_custom or [octavacion_default] * len(asignaciones)
     if armonizaciones_custom is not None:
         for idx, arm in enumerate(armonizaciones_custom):
             if idx < len(asignaciones):
@@ -91,6 +96,7 @@ def _montuno_generico(
         inicio_cor=inicio_cor,
         return_pm=return_pm,
         aleatorio=aleatorio,
+        octavaciones=octavaciones,
     )
 
 
@@ -109,6 +115,8 @@ def montuno_tradicional(
     aleatorio: bool = False,
     armonizaciones_custom: Optional[List[str]] = None,
     asignaciones_custom: Optional[List[Tuple[str, List[int], str]]] = None,
+    octavacion_default: Optional[str] = None,
+    octavaciones_custom: Optional[List[str]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Generate a montuno in the traditional style."""
 
@@ -125,6 +133,8 @@ def montuno_tradicional(
         aleatorio=aleatorio,
         armonizaciones_custom=armonizaciones_custom,
         asignaciones_custom=asignaciones_custom,
+        octavacion_default=octavacion_default,
+        octavaciones_custom=octavaciones_custom,
     )
 
 
@@ -139,6 +149,8 @@ def montuno_extendido(
     aleatorio: bool = False,
     armonizaciones_custom: Optional[List[str]] = None,
     asignaciones_custom: Optional[List[Tuple[str, List[int], str]]] = None,
+    octavacion_default: Optional[str] = None,
+    octavaciones_custom: Optional[List[str]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Generate a montuno emphasising extended chord tones."""
 
@@ -155,6 +167,8 @@ def montuno_extendido(
         aleatorio=aleatorio,
         armonizaciones_custom=armonizaciones_custom,
         asignaciones_custom=asignaciones_custom,
+        octavacion_default=octavacion_default,
+        octavaciones_custom=octavaciones_custom,
     )
 
 
