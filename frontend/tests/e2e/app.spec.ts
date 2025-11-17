@@ -16,10 +16,10 @@ test.describe('Generador de Montunos - flujo principal', () => {
 
     await expect(page.locator('#summary-content')).toContainText('Compases');
 
-    const chordsTableRows = page.locator('#chords tr');
-    await expect(chordsTableRows).toHaveCount(4);
+    const chordCards = page.locator('.signal-viewer__chord');
+    await expect(chordCards).toHaveCount(4, { timeout: 15000 });
 
     const downloadButton = page.getByRole('button', { name: 'Descargar MIDI' });
-    await expect(downloadButton).toBeEnabled();
+    await expect(downloadButton).toBeEnabled({ timeout: 15000 });
   });
 });

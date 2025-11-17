@@ -424,9 +424,34 @@ function buildLayout(): string {
               <p>Visualiza al instante el montuno generado, ajusta cada acorde y mándalo a Signal con un solo clic.</p>
             </div>
             <div class="signal-embed__toolbar" aria-label="Reproducción y controles avanzados">
-              <button type="button" id="generate" class="icon-btn" title="Generar montuno">⟳</button>
-              <button type="button" id="play" class="icon-btn" title="Reproducir o detener">⏯</button>
-              <button type="button" id="download" class="icon-btn" title="Descargar MIDI" disabled>⬇</button>
+              <button
+                type="button"
+                id="generate"
+                class="icon-btn"
+                title="Generar montuno"
+                aria-label="Generar montuno"
+              >
+                ⟳
+              </button>
+              <button
+                type="button"
+                id="play"
+                class="icon-btn"
+                title="Reproducir o detener"
+                aria-label="Reproducir o detener"
+              >
+                ⏯
+              </button>
+              <button
+                type="button"
+                id="download"
+                class="icon-btn"
+                title="Descargar MIDI"
+                aria-label="Descargar MIDI"
+                disabled
+              >
+                ⬇
+              </button>
               <div class="icon-btn__group" role="group" aria-label="Desplazar inversiones">
                 <button type="button" id="shift-inv-up" class="icon-btn" title="Subir inversiones">⤴</button>
                 <button type="button" id="shift-inv-down" class="icon-btn" title="Bajar inversiones">⤵</button>
