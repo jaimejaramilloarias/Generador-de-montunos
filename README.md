@@ -5,6 +5,8 @@ Este repositorio contiene las dos variantes del generador de montunos:
 - **Aplicación de escritorio** construida con Tk/CustomTk.
 - **Aplicación web** basada en Vite + TypeScript que puede desplegarse en GitHub Pages sin dependencias adicionales.
 
+Puedes abrir la interfaz web directamente en GitHub Pages sin instalar nada: https://jaimejaramilloarias.github.io/Generador-de-montunos/
+
 ## Estructura del repositorio
 
 | Carpeta        | Contenido principal |
