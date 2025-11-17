@@ -134,6 +134,27 @@ export function stepInversionPitch(
   const rotationOrder: Inversion[] = ['root', 'third', 'fifth'];
   const pitchClasses = inversionPitchClasses(chordName).filter((entry) => rotationOrder.includes(entry.inversion));
   const currentIdx = pitchClasses.findIndex((entry) => entry.inversion === currentInversion);
+
+  const targetIdx =
+    currentIdx === -1
+      ? (direction === 1 ? 0 : pitchClasses.length - 1)
+      : (currentIdx + direction + pitchClasses.length) % pitchClasses.length;
+  const target = pitchClasses[targetIdx];
+
+  const registerOffset = deriveRegisterOffset(chordName, currentInversion, currentPitch);
+  const basePitch = inversionBasePitch(chordName, target.inversion);
+  let pitch = basePitch + registerOffset * SEMITONES_IN_OCTAVE;
+
+  if (direction === 1) {
+    while (pitch <= currentPitch + 1e-6) {
+      pitch += SEMITONES_IN_OCTAVE;
+    }
+  }
+  if (direction === -1) {
+    while (pitch >= currentPitch - 1e-6) {
+      pitch -= SEMITONES_IN_OCTAVE;
+    }
+
   const safeCurrent = currentIdx === -1 ? pitchClasses[0] : pitchClasses[currentIdx];
 
   const targetIdx =
@@ -151,6 +172,7 @@ export function stepInversionPitch(
   }
   if (direction === -1 && pitch >= currentPitch - 1e-6) {
     pitch -= SEMITONES_IN_OCTAVE;
+main
   }
 
   return { inversion: target.inversion, pitch } satisfies ResolvedChordInversion;
