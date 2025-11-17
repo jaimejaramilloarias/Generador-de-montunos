@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Miscellaneous helper functions used across the GUI."""
 
-from typing import Callable, Iterable, List, Optional, Tuple
+from typing import Callable, Iterable, List, Optional, Sequence, Tuple, Union
 import json
 import re
 from pathlib import Path
@@ -65,27 +65,52 @@ def calc_default_inversions(
     get_bass_pitch: Callable[[str, str], int],
     ajustar_rango_flexible: Callable[[Optional[int], int], int],
     seleccionar_inversion: Callable[[Optional[int], str], Tuple[str, int]],
-) -> List[str]:
-    """Return default inversions for ``asignaciones`` using the salsa helpers."""
+    manual_overrides: Optional[Sequence[Optional[str]]] = None,
+    offset_getter: Optional[Callable[[int], int]] = None,
+    *,
+    return_pitches: bool = False,
+) -> Union[List[str], Tuple[List[str], List[int]]]:
+    """Return default inversions (and optional bass targets) using the salsa helpers.
+
+    ``manual_overrides`` allows callers to inject per-chord inversion choices
+    while keeping the linked-voice logic intact.  ``offset_getter`` can supply
+    an additional octave displacement per index (e.g. to reflect octavation
+    labels).  When ``return_pitches`` is ``True`` the function returns a
+    ``(inversions, pitches)`` tuple with the adjusted bass pitch for each
+    inversion; otherwise only the inversion list is returned.
+    """
+
     invs: List[str] = []
-    voz = None
+    pitches: List[int] = []
+    voz: Optional[int] = None
+    overrides = list(manual_overrides or [])
+
     for idx, data in enumerate(asignaciones):
         cif = data[0]
         inv_for = data[3] if len(data) > 3 else None
-        if idx == 0:
+        override = overrides[idx] if idx < len(overrides) else None
+        offset = offset_getter(idx) if offset_getter is not None else 0
+
+        if override:
+            inv = override
+            pitch = get_bass_pitch(cif, inv) + offset
+            pitch = ajustar_rango_flexible(voz, pitch)
+        elif idx == 0:
             inv = inv_for or limpiar_inversion(inversion_getter())
-            pitch = get_bass_pitch(cif, inv)
+            pitch = get_bass_pitch(cif, inv) + offset
             pitch = ajustar_rango_flexible(voz, pitch)
         else:
             if inv_for:
                 inv = inv_for
-                pitch = get_bass_pitch(cif, inv)
+                pitch = get_bass_pitch(cif, inv) + offset
                 pitch = ajustar_rango_flexible(voz, pitch)
             else:
                 inv, pitch = seleccionar_inversion(voz, cif)
         invs.append(inv)
+        pitches.append(pitch)
         voz = pitch
-    return invs
+
+    return (invs, pitches) if return_pitches else invs
 
 
 def normalise_bars(text: str) -> str:

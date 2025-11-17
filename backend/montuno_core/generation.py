@@ -123,18 +123,20 @@ def generate_montuno(
 
         inversion_limpia = limpiar_inversion(inversion)
 
-        default_inversions = calc_default_inversions(
+        default_inversions, bass_targets = calc_default_inversions(
             asignaciones_all,
             lambda: inversion_limpia,
             salsa.get_bass_pitch,
             salsa._ajustar_rango_flexible,
             salsa.seleccionar_inversion,
+            inversiones_por_indice,
+            offset_getter=lambda idx: salsa._offset_octavacion(octavaciones[idx]),
+            return_pitches=True,
         )
 
-        for idx, asign in enumerate(asignaciones_all):
-            if not inversiones[idx]:
-                inversiones[idx] = default_inversions[idx]
+        inversiones = [inv or default_inv for inv, default_inv in zip(inversiones, default_inversions)]
 
+        for idx, asign in enumerate(asignaciones_all):
             if modos[idx] != "Extendido" and _is_extended_chord(asign[0]):
                 modos[idx] = "Extendido"
 
@@ -210,6 +212,7 @@ def generate_montuno(
                 asign_seg = [tuple(a) for a in segmento.assignments]
                 kwargs = {"asignaciones_custom": asign_seg}
                 inv_seg = [inversiones[i] for i in segmento.chord_indices]
+                bass_seg = [bass_targets[i] for i in segmento.chord_indices]
                 oct_seg = [octavaciones[i] for i in segmento.chord_indices]
                 kwargs["octavacion_default"] = octavacion_default
                 kwargs["octavaciones_custom"] = oct_seg
@@ -230,6 +233,7 @@ def generate_montuno(
                     armon_seg = [armonias[i] for i in segmento.chord_indices]
                     kwargs["armonizaciones_custom"] = armon_seg
                     kwargs["aleatorio"] = True
+                    kwargs["bajos_objetivo"] = bass_seg
 
                 funcion(
                     "",
