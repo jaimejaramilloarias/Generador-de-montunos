@@ -44,6 +44,16 @@ describe('resolveInversionChain', () => {
     );
     expect(resolvedManual[2].pitch).toBeCloseTo(closest.pitch, 6);
   });
+
+  it('elige la nota más cercana aunque sea una extensión', () => {
+    const chords = [buildChord(0, 'D7'), buildChord(1, 'Cmaj9'), buildChord(2, 'G7')];
+
+    const resolved = resolveInversionChain(chords, 'root');
+
+    expect(resolved[0].pitch).toBeGreaterThan(0);
+    expect(resolved[1].pitch).toBe(resolved[0].pitch);
+    expect(Math.abs(resolved[2].pitch - resolved[1].pitch)).toBeLessThanOrEqual(8);
+  });
 });
 
 describe('formatMidiNote', () => {
