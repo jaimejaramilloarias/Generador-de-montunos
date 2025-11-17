@@ -100,6 +100,31 @@ describe('generateMontuno', () => {
     );
   });
 
+  it('mantiene disponible el modo extendido como override por acorde con modo global tradicional', async () => {
+    const customState: AppState = {
+      ...baseState,
+      modoDefault: 'Tradicional',
+      chords: baseState.chords.map((chord, index) =>
+        index === 1 ? { ...chord, modo: 'Extendido' } : chord
+      ),
+    };
+
+    await generateMontuno(customState);
+
+    expect(generateMontunoRaw).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modoDefault: 'Tradicional',
+        chords: customState.chords.map((chord) => ({
+          index: chord.index,
+          modo: chord.modo,
+          armonizacion: chord.armonizacion,
+          inversion: chord.inversion,
+        })),
+      }),
+      expect.any(String)
+    );
+  });
+
   it('recorta notas superpuestas cuando cambian los modos por acorde', async () => {
     const midi = new Midi();
     const track = midi.addTrack();
