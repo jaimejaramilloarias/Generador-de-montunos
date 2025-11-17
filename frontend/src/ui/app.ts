@@ -567,7 +567,7 @@ function buildLayout(): string {
                 <p>Visualiza al instante el montuno generado y mándalo a Signal con un solo clic.</p>
               </div>
               <div class="signal-embed__cta-group">
-                <button type="button" id="signal-download" class="btn btn--ghost">Descargar MIDI</button>
+                <button type="button" id="signal-download" class="btn btn--ghost">Exportar para Signal</button>
                 <a
                   id="signal-open"
                   class="btn signal-embed__cta"
