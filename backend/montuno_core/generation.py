@@ -42,7 +42,10 @@ def _normalise_sequence(
     default: str,
     length: int,
 ) -> List[str]:
-    result = list(values or [])
+    # Use the provided ``default`` whenever an entry is missing or ``None`` so
+    # that callers can pass sparse lists (e.g. JSON payloads omitting optional
+    # fields) without losing the intended fallback.
+    result = [value or default for value in (values or [])]
     if len(result) < length:
         result.extend([default] * (length - len(result)))
     return result[:length]
