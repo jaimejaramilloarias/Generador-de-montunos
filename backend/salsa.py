@@ -115,15 +115,19 @@ def get_bass_pitch(cifrado: str, inversion: str) -> int:
         raise ValueError(f"Inversión desconocida: {inversion}")
 
 
-def seleccionar_inversion(anterior: Optional[int], cifrado: str) -> Tuple[str, int]:
+def seleccionar_inversion(
+    anterior: Optional[int], cifrado: str, offset_octava: int = 0
+) -> Tuple[str, int]:
     """Selecciona la inversión con la voz grave más cercana a ``anterior``.
 
     Si la voz grave previa pertenece al acorde actual, se reutiliza como bajo.
+    ``offset_octava`` permite incorporar el desplazamiento manual de registro en
+    el cálculo de cercanía.
     """
 
     candidatos: List[Tuple[int, str, int, int]] = []
     for inv in INVERSIONS:
-        base_pitch = get_bass_pitch(cifrado, inv)
+        base_pitch = get_bass_pitch(cifrado, inv) + offset_octava
         pitch = _ajustar_rango_flexible(anterior, base_pitch)
         distancia = 0 if anterior is None else abs(pitch - anterior)
         candidatos.append((distancia, inv, pitch, base_pitch % 12))
@@ -444,22 +448,36 @@ def montuno_salsa(
     if inversiones_manual is None:
         inversiones = []
         voz_grave_anterior = None
+        bajos_objetivo: Dict[int, int] = {}
         for idx, (cifrado, _, _, inv_forzado) in enumerate(asignaciones):
+            octava = _offset_octavacion(octavaciones[idx])
             if idx == 0:
                 inv = inv_forzado or inversion_inicial
-                pitch = get_bass_pitch(cifrado, inv)
-                pitch = _ajustar_rango_flexible(voz_grave_anterior, pitch)
+                base_pitch = get_bass_pitch(cifrado, inv) + octava
+                pitch = _ajustar_rango_flexible(voz_grave_anterior, base_pitch)
             else:
                 if inv_forzado:
                     inv = inv_forzado
-                    pitch = get_bass_pitch(cifrado, inv)
-                    pitch = _ajustar_rango_flexible(voz_grave_anterior, pitch)
+                    base_pitch = get_bass_pitch(cifrado, inv) + octava
+                    pitch = _ajustar_rango_flexible(voz_grave_anterior, base_pitch)
                 else:
-                    inv, pitch = seleccionar_inversion(voz_grave_anterior, cifrado)
+                    inv, pitch = seleccionar_inversion(
+                        voz_grave_anterior, cifrado, octava
+                    )
             inversiones.append(inv)
+            bajos_objetivo[idx] = pitch
             voz_grave_anterior = pitch
     else:
         inversiones = inversiones_manual
+        bajos_objetivo = {}
+        voz_grave_anterior = None
+        for idx, (cifrado, _, _, _) in enumerate(asignaciones):
+            inv = inversiones[idx]
+            octava = _offset_octavacion(octavaciones[idx])
+            base_pitch = get_bass_pitch(cifrado, inv) + octava
+            pitch = _ajustar_rango_flexible(voz_grave_anterior, base_pitch)
+            bajos_objetivo[idx] = pitch
+            voz_grave_anterior = pitch
 
     # Carga los midis de referencia una única vez por inversión y
     # construye las posiciones repetidas para toda la progresión
@@ -496,6 +514,28 @@ def montuno_salsa(
         for ix in idxs:
             inv_por_cor[ix] = inversiones[idx]
 
+    mas_grave_por_acorde: Dict[int, int] = {}
+    for idx, (acorde, _, _, _) in enumerate(asignaciones):
+        inv = inversiones[idx]
+        base_min: Optional[int] = None
+        for grupo in grupos_por_inv[inv]:
+            for pos in grupo:
+                pitch, _ = traducir_nota(pos["name"], acorde)
+                if base_min is None or pitch < base_min:
+                    base_min = pitch
+        mas_grave_por_acorde[idx] = base_min if base_min is not None else 0
+
+    ajuste_por_acorde: Dict[int, int] = {}
+    for idx in range(len(asignaciones)):
+        objetivo = bajos_objetivo.get(idx)
+        base_min = mas_grave_por_acorde.get(idx, 0)
+        octava = offset_octava.get(idx, 0)
+        if objetivo is None:
+            ajuste_por_acorde[idx] = 0
+            continue
+        diff = objetivo - (base_min + octava)
+        ajuste_por_acorde[idx] = 12 * round(diff / 12)
+
     notas_finales: List[pretty_midi.Note] = []
     for cor in range(total_dest_cor):
         inv = inv_por_cor.get(cor)
@@ -504,6 +544,7 @@ def montuno_salsa(
         idx_acorde = mapa[cor]
         acorde, _, _, _ = asignaciones[idx_acorde]
         octava = offset_octava.get(idx_acorde, 0)
+        ajuste = ajuste_por_acorde.get(idx_acorde, 0)
         grupos_act = grupos_por_inv
         ref_idx = (inicio_cor + cor + offset_ref) % total_ref_cor
         for pos in grupos_act[inv][ref_idx]:
@@ -522,7 +563,7 @@ def montuno_salsa(
             notas_finales.append(
                 pretty_midi.Note(
                     velocity=pos["velocity"],
-                    pitch=pitch + octava,
+                    pitch=pitch + octava + ajuste,
                     start=inicio,
                     end=end,
                 )
