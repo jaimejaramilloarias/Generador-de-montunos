@@ -8,8 +8,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pretty_midi
 
-from .. import midi_utils, midi_utils_tradicional, salsa
-from ..modos import MODOS_DISPONIBLES
+from .. import midi_utils, midi_utils_tradicional, modos, salsa
 from ..utils import apply_manual_edits, limpiar_inversion, calc_default_inversions
 
 from .config import ClaveConfig, get_clave_tag
@@ -42,7 +41,10 @@ def _normalise_sequence(
     default: str,
     length: int,
 ) -> List[str]:
-    result = list(values or [])
+    # Use the provided ``default`` whenever an entry is missing or ``None`` so
+    # that callers can pass sparse lists (e.g. JSON payloads omitting optional
+    # fields) without losing the intended fallback.
+    result = [value or default for value in (values or [])]
     if len(result) < length:
         result.extend([default] * (length - len(result)))
     return result[:length]
@@ -108,7 +110,7 @@ def generate_montuno(
             raise ValueError("Progresión vacía")
 
         num_chords = len(asignaciones_all)
-        modos = _normalise_sequence(modo_por_acorde, modo_default, num_chords)
+        modos_seq = _normalise_sequence(modo_por_acorde, modo_default, num_chords)
         armonias = _normalise_sequence(armonias_por_indice, armonizacion_default, num_chords)
         inversiones = _normalise_optional_sequence(inversiones_por_indice, num_chords)
 
@@ -126,14 +128,14 @@ def generate_montuno(
             if not inversiones[idx]:
                 inversiones[idx] = default_inversions[idx]
 
-            if modos[idx] != "Extendido" and _is_extended_chord(asign[0]):
-                modos[idx] = "Extendido"
+            if modos_seq[idx] != "Extendido" and _is_extended_chord(asign[0]):
+                modos_seq[idx] = "Extendido"
 
         segmentos: List[_Segment] = []
         start = 0
-        modo_actual = modos[0]
+        modo_actual = modos_seq[0]
         for idx in range(1, num_chords):
-            if modos[idx] != modo_actual:
+            if modos_seq[idx] != modo_actual:
                 segmentos.append(
                     _Segment(
                         modo_actual,
@@ -143,7 +145,7 @@ def generate_montuno(
                     )
                 )
                 start = idx
-                modo_actual = modos[idx]
+                modo_actual = modos_seq[idx]
         segmentos.append(
             _Segment(
                 modo_actual,
@@ -176,7 +178,7 @@ def generate_montuno(
 
         with TemporaryDirectory() as tmpdir:
             for idx, segmento in enumerate(segmentos):
-                funcion = MODOS_DISPONIBLES.get(segmento.mode)
+                funcion = modos.MODOS_DISPONIBLES.get(segmento.mode)
                 if funcion is None:
                     raise ValueError(f"Modo no soportado: {segmento.mode}")
 
