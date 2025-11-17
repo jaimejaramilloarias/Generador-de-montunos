@@ -19,7 +19,7 @@ body {
 }
 
 #app {
-  width: min(1200px, 100%);
+  width: 100%;
 }
 
 .app {
@@ -32,6 +32,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+}
+
+.app__signal {
+  width: 100%;
 }
 
 .app__header h1 {
