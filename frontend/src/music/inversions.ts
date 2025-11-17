@@ -72,6 +72,42 @@ export function calculateBassPitch(
   return adjustFlexibleRange(prevPitch, basePitch);
 }
 
+function nearestPitchForPc(prevPitch: number, pitchClass: number): number {
+  const baseOctave = Math.round((prevPitch - pitchClass) / 12);
+  const centered = pitchClass + 12 * baseOctave;
+  const candidates = [centered - 12, centered, centered + 12];
+
+  return candidates.reduce((best, candidate) => {
+    const distance = Math.abs(candidate - prevPitch);
+    if (distance < Math.abs(best - prevPitch)) {
+      return candidate;
+    }
+    if (distance === Math.abs(best - prevPitch)) {
+      return Math.min(best, candidate);
+    }
+    return best;
+  }, candidates[0]);
+}
+
+function chordPitchClasses(chordName: string): number[] {
+  const rootPc = getChordRootSemitone(chordName) ?? 0;
+  const intervals = detectIntervals(chordName);
+  const pcs = new Set<number>();
+  intervals.forEach((interval) => pcs.add((rootPc + interval) % 12));
+  return Array.from(pcs);
+}
+
+function selectNearestChordTone(chordName: string, prevPitch: number) {
+  const pitchClasses = chordPitchClasses(chordName);
+
+  return pitchClasses
+    .map((pc) => {
+      const pitch = nearestPitchForPc(prevPitch, pc);
+      return { pc, pitch, distance: Math.abs(pitch - prevPitch) };
+    })
+    .sort((a, b) => a.distance - b.distance || a.pitch - b.pitch)[0];
+}
+
 function selectClosestInversion(chordName: string, prevPitch: number | null): ResolvedChordInversion {
   const candidates = INVERSION_ORDER.map((inversion) => {
     const pitch = calculateBassPitch(chordName, inversion, prevPitch);
@@ -98,10 +134,19 @@ export function resolveInversionChain(
 ): ResolvedChordInversion[] {
   let prevPitch: number | null = null;
   return chords.map((chord, idx) => {
-    const chosenInversion = chord.inversion ?? (idx === 0
-      ? inversionDefault
-      : selectClosestInversion(chord.name, prevPitch).inversion);
-    const pitch = calculateBassPitch(chord.name, chosenInversion, prevPitch);
+    let chosenInversion = chord.inversion ?? inversionDefault;
+    let pitch = calculateBassPitch(chord.name, chosenInversion, prevPitch);
+
+    if (chord.inversion === null && idx > 0 && prevPitch !== null) {
+      const closestTone = selectNearestChordTone(chord.name, prevPitch);
+      const matchingInversion = INVERSION_ORDER.find(
+        (inv) => (inversionBasePitch(chord.name, inv) % 12 + 12) % 12 === closestTone.pc
+      );
+
+      chosenInversion = matchingInversion ?? inversionDefault;
+      pitch = adjustFlexibleRange(prevPitch, closestTone.pitch);
+    }
+
     prevPitch = pitch;
     return { inversion: chosenInversion, pitch } satisfies ResolvedChordInversion;
   });
