@@ -1,6 +1,6 @@
 import type { Armonizacion, Inversion } from '../types';
 
-const NOTE_TO_SEMITONE: Record<string, number> = {
+export const NOTE_TO_SEMITONE: Record<string, number> = {
   C: 0,
   'C#': 1,
   Db: 1,
@@ -44,7 +44,7 @@ const QUALITY_INTERVALS: Record<string, number[]> = {
 
 const DEFAULT_INTERVALS = [0, 4, 7];
 
-function detectIntervals(chordName: string): number[] {
+export function detectIntervals(chordName: string): number[] {
   const lowered = chordName.toLowerCase();
   if (chordName.includes('∆13') || lowered.includes('maj13')) return QUALITY_INTERVALS.maj13;
   if (chordName.includes('∆11') || lowered.includes('maj11')) return QUALITY_INTERVALS.maj11;
@@ -69,9 +69,18 @@ function detectIntervals(chordName: string): number[] {
   return DEFAULT_INTERVALS;
 }
 
-function extractRootSymbol(chordName: string): string | null {
+export function extractRootSymbol(chordName: string): string | null {
   const match = chordName.match(/^([A-G](?:#|b)?)/i);
   return match ? match[1] : null;
+}
+
+export function getChordRootSemitone(chordName: string): number | null {
+  const symbol = extractRootSymbol(chordName);
+  if (!symbol) {
+    return null;
+  }
+  const key = NOTE_TO_SEMITONE[symbol.toUpperCase()] !== undefined ? symbol.toUpperCase() : symbol;
+  return NOTE_TO_SEMITONE[key] ?? null;
 }
 
 const inversionSteps: Record<Inversion, number> = {

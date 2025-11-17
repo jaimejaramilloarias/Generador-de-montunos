@@ -14,6 +14,7 @@ import { ARMONIZACIONES, CLAVES, INVERSIONES, INVERSION_ORDER, MODOS, VARIACIONE
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
 import { isExtendedChordName } from '../utils/chords';
+import { listBassOptions, resolveInversionChain } from '../music/inversions';
 
 const listeners = new Set<(state: AppState) => void>();
 
@@ -290,6 +291,39 @@ export function setChord(
   });
   updateState({ chords });
   markDirty();
+}
+
+export function nudgeChordBass(index: number, direction: 1 | -1): void {
+  const resolved = resolveInversionChain(state.chords, state.inversionDefault);
+  const chord = state.chords[index];
+  const current = resolved[index];
+  if (!chord || !current) {
+    return;
+  }
+  const prevPitch = index > 0 ? resolved[index - 1]?.pitch ?? null : null;
+  const options = listBassOptions(chord.name, prevPitch);
+  if (!options.length) {
+    return;
+  }
+
+  const unique: typeof options = [];
+  options.forEach((option) => {
+    if (!unique.some((entry) => entry.inversion === option.inversion && Math.abs(entry.pitch - option.pitch) < 1e-6)) {
+      unique.push(option);
+    }
+  });
+
+  const currentIndex = unique.findIndex(
+    (option) => option.inversion === current.inversion && Math.abs(option.pitch - current.pitch) < 1e-6
+  );
+  const fallbackIndex = currentIndex === -1 ? unique.findIndex((option) => option.inversion === current.inversion) : currentIndex;
+  const baseIndex = fallbackIndex === -1 ? 0 : fallbackIndex;
+  const targetIndex = Math.min(Math.max(baseIndex + direction, 0), unique.length - 1);
+
+  const target = unique[targetIndex];
+  if (target && target.inversion !== chord.inversion) {
+    setChord(index, { inversion: target.inversion });
+  }
 }
 
 export function shiftAllInversions(delta: number): void {

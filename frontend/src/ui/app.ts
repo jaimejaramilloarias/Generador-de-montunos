@@ -13,6 +13,7 @@ import {
   setDefaultInversion,
   setDefaultModo,
   shiftAllInversions,
+  nudgeChordBass,
   setMidiOutputs,
   setMidiStatus,
   setSelectedMidiOutput,
@@ -27,9 +28,10 @@ import {
   updateManualEdit,
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
-import type { AppState, ChordConfig, GenerationResult, MidiStatus } from '../types';
+import type { AppState, ChordConfig, GenerationResult, MidiStatus, ResolvedChordInversion } from '../types';
 import { CHORD_SUFFIX_SUGGESTIONS, getChordSuffixSuggestions } from '../utils/chordAutocomplete';
 import { isExtendedChordName } from '../utils/chords';
+import { formatMidiNote, resolveInversionChain } from '../music/inversions';
 
 type GeneratorModule = typeof import('../music/generator');
 type AudioModule = typeof import('../audio/player');
@@ -327,6 +329,7 @@ function buildLayout(): string {
                     <th>Modo</th>
                     <th>Armonización</th>
                     <th>Inversión</th>
+                    <th>Nota grave</th>
                   </tr>
                 </thead>
                 <tbody id="chords"></tbody>
@@ -785,8 +788,9 @@ function populateSelect(select: HTMLSelectElement, options: { value: string; lab
 
 function renderChordRows(state: AppState, tbody: HTMLTableSectionElement): void {
   tbody.innerHTML = '';
+  const resolved = resolveInversionChain(state.chords, state.inversionDefault);
   state.chords.forEach((chord) => {
-    tbody.appendChild(buildChordRow(chord));
+    tbody.appendChild(buildChordRow(chord, resolved[chord.index]));
   });
 }
 
@@ -801,7 +805,7 @@ function applyChordValidityStyles(cell: HTMLTableCellElement, isRecognized: bool
   }
 }
 
-function buildChordRow(chord: ChordConfig): HTMLTableRowElement {
+function buildChordRow(chord: ChordConfig, resolved?: ResolvedChordInversion): HTMLTableRowElement {
   const row = document.createElement('tr');
 
   const indexCell = document.createElement('td');
@@ -816,9 +820,11 @@ function buildChordRow(chord: ChordConfig): HTMLTableRowElement {
   const modoCell = document.createElement('td');
   const armonizacionCell = document.createElement('td');
   const inversionCell = document.createElement('td');
+  const bassCell = document.createElement('td');
   row.appendChild(modoCell);
   row.appendChild(armonizacionCell);
   row.appendChild(inversionCell);
+  row.appendChild(bassCell);
 
   const modoSelect = createSelect(MODOS, chord.modo, (value) => {
     setChord(chord.index, { modo: value as AppState['modoDefault'] });
@@ -837,6 +843,30 @@ function buildChordRow(chord: ChordConfig): HTMLTableRowElement {
   modoCell.appendChild(modoSelect);
   armonizacionCell.appendChild(armonizacionSelect);
   inversionCell.appendChild(inversionSelect);
+
+  const bassLabel = document.createElement('div');
+  bassLabel.classList.add('bass-note');
+  bassLabel.textContent = resolved ? formatMidiNote(resolved.pitch) : '—';
+
+  const bassControls = document.createElement('div');
+  bassControls.classList.add('bass-controls');
+
+  const bassUp = document.createElement('button');
+  bassUp.type = 'button';
+  bassUp.classList.add('bass-controls__btn');
+  bassUp.textContent = '↑';
+  bassUp.title = 'Subir nota grave';
+  bassUp.addEventListener('click', () => nudgeChordBass(chord.index, 1));
+
+  const bassDown = document.createElement('button');
+  bassDown.type = 'button';
+  bassDown.classList.add('bass-controls__btn');
+  bassDown.textContent = '↓';
+  bassDown.title = 'Bajar nota grave';
+  bassDown.addEventListener('click', () => nudgeChordBass(chord.index, -1));
+
+  bassControls.append(bassUp, bassDown);
+  bassCell.append(bassLabel, bassControls);
 
   return row;
 }
