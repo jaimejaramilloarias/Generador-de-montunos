@@ -44,6 +44,9 @@ let audioModulePromise: Promise<AudioModule> | null = null;
 let midiExportModulePromise: Promise<MidiExportModule> | null = null;
 let midiManagerModulePromise: Promise<MidiManagerModule> | null = null;
 let midiOutputsUnsubscribe: (() => void) | null = null;
+let previousState: AppState | null = null;
+let autoGenerateHandle: number | null = null;
+let hasRenderedOnce = false;
 
 interface UiRefs {
   progressionInput: HTMLTextAreaElement;
@@ -159,6 +162,31 @@ async function stopExistingWebAudio(): Promise<void> {
   }
 }
 
+async function stopAllPlayback(): Promise<void> {
+  const midiPromise = getState().midiStatus === 'ready'
+    ? getMidiManagerModule().catch((error) => {
+        console.warn('No se pudo acceder al administrador MIDI.', error);
+        return null;
+      })
+    : Promise.resolve(null);
+  const [audio, midi] = await Promise.all([getExistingAudioModule(), midiPromise]);
+
+  try {
+    audio?.stop();
+  } catch (error) {
+    console.warn('No se pudo detener el sintetizador web.', error);
+  }
+
+  try {
+    midi?.stopPlayback();
+  } catch (error) {
+    console.warn('No se pudo detener la reproducción MIDI.', error);
+  }
+
+  resetPlayback();
+  setIsPlaying(false);
+}
+
 async function applyMidiSelection(nextId: string | null, options?: { force?: boolean }): Promise<void> {
   const previous = getState().selectedMidiOutputId;
   const shouldUpdate = options?.force || previous !== nextId;
@@ -246,13 +274,116 @@ function refreshChordSuffixHints(refs: UiRefs): void {
   renderSuffixHints(refs.chordHints, suggestions);
 }
 
+function scheduleAutoGeneration(state: AppState, refs: UiRefs): void {
+  if (!hasRenderedOnce) {
+    return;
+  }
+  const hasBlockingState =
+    state.isGenerating || state.generated || state.errors.length > 0 || !state.progressionInput.trim();
+
+  if (hasBlockingState) {
+    if (autoGenerateHandle !== null) {
+      window.clearTimeout(autoGenerateHandle);
+      autoGenerateHandle = null;
+    }
+    return;
+  }
+
+  if (autoGenerateHandle !== null) {
+    window.clearTimeout(autoGenerateHandle);
+  }
+  autoGenerateHandle = window.setTimeout(() => {
+    autoGenerateHandle = null;
+    const latest = getState();
+    if (latest.isGenerating || latest.generated || latest.errors.length > 0) {
+      return;
+    }
+    if (!latest.progressionInput.trim()) {
+      return;
+    }
+    void handleGenerate(refs);
+  }, 250);
+}
+
+function shouldIgnorePlaybackHotkey(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  if (target.isContentEditable) {
+    return true;
+  }
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON';
+}
+
+async function togglePlayback(refs: UiRefs): Promise<void> {
+  const initialState = getState();
+  const useWebAudio = !initialState.selectedMidiOutputId;
+  const audio = useWebAudio ? await getAudioModule() : null;
+  if (audio) {
+    await ensureWebAudioReady(audio);
+  }
+  let state = getState();
+  let result = state.generated;
+  if (!result) {
+    result = await handleGenerate(refs);
+    state = getState();
+    if (!result) {
+      return;
+    }
+  }
+
+  const midi = state.midiStatus === 'ready'
+    ? await getMidiManagerModule().catch((error) => {
+        console.warn('No se pudo acceder al administrador MIDI.', error);
+        return null;
+      })
+    : null;
+
+  if (state.isPlaying || (audio?.isPlaying?.() ?? false)) {
+    await stopAllPlayback();
+    return;
+  }
+
+  if (useWebAudio) {
+    await audio!.loadSequence(result.events, result.bpm);
+  }
+  if (midi) {
+    try {
+      midi.preparePlayback(result.events, result.bpm);
+      midi.startPlayback();
+    } catch (error) {
+      console.warn('No se pudo iniciar la reproducción MIDI.', error);
+    }
+  }
+  if (useWebAudio) {
+    audio!.play();
+  }
+  setIsPlaying(true);
+  window.setTimeout(() => {
+    if (audio?.isPlaying?.()) {
+      audio.stop();
+    }
+    midi?.stopPlayback();
+    setIsPlaying(false);
+  }, result.durationSeconds * 1000 + 100);
+}
+
 let lastActiveProgressionId: string | null = null;
 
 export function setupApp(root: HTMLElement): void {
   root.innerHTML = buildLayout();
   const refs = grabRefs(root);
   bindStaticEvents(refs, root);
-  subscribe((state) => updateUi(state, refs));
+  subscribe((state) => {
+    updateUi(state, refs);
+    if (previousState?.generated && !state.generated) {
+      void stopAllPlayback();
+    }
+    scheduleAutoGeneration(state, refs);
+    hasRenderedOnce = true;
+    previousState = state;
+  });
   scheduleModulePrefetch();
 }
 
@@ -600,62 +731,22 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     await handleGenerate(refs);
   });
 
-  refs.playBtn.addEventListener('click', async () => {
-    const initialState = getState();
-    const useWebAudio = !initialState.selectedMidiOutputId;
-    const audio = useWebAudio ? await getAudioModule() : null;
-    if (audio) {
-      await ensureWebAudioReady(audio);
-    }
-    let state = getState();
-    let result = state.generated;
-    if (!result) {
-      result = await handleGenerate(refs);
-      state = getState();
-      if (!result) {
-        return;
-      }
-    }
+  refs.playBtn.addEventListener('click', () => {
+    void togglePlayback(refs);
+  });
 
-    const midiState = getState();
-    const midi = midiState.midiStatus === 'ready'
-      ? await getMidiManagerModule().catch((error) => {
-          console.warn('No se pudo acceder al administrador MIDI.', error);
-          return null;
-        })
-      : null;
-
-    if (state.isPlaying || (audio?.isPlaying?.() ?? false)) {
-      audio?.stop();
-      midi?.stopPlayback();
-      resetPlayback();
-      setIsPlaying(false);
+  const handleSpaceToggle = (event: KeyboardEvent): void => {
+    if (event.code !== 'Space' && event.key !== ' ') {
       return;
     }
+    if (shouldIgnorePlaybackHotkey(event.target)) {
+      return;
+    }
+    event.preventDefault();
+    void togglePlayback(refs);
+  };
 
-    if (useWebAudio) {
-      await audio!.loadSequence(result.events, result.bpm);
-    }
-    if (midi) {
-      try {
-        midi.preparePlayback(result.events, result.bpm);
-        midi.startPlayback();
-      } catch (error) {
-        console.warn('No se pudo iniciar la reproducción MIDI.', error);
-      }
-    }
-    if (useWebAudio) {
-      audio!.play();
-    }
-    setIsPlaying(true);
-    window.setTimeout(() => {
-      if (audio?.isPlaying?.()) {
-        audio.stop();
-      }
-      midi?.stopPlayback();
-      setIsPlaying(false);
-    }, result.durationSeconds * 1000 + 100);
-  });
+  window.addEventListener('keydown', handleSpaceToggle);
 
   refs.downloadBtn.addEventListener('click', async () => {
     const state = getState();
