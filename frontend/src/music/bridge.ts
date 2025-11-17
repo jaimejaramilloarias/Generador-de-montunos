@@ -5,6 +5,7 @@ export interface RawGenerationInput {
   clave: string;
   modoDefault: AppState['modoDefault'];
   armonizacionDefault: AppState['armonizacionDefault'];
+  octavacionDefault: AppState['octavacionDefault'];
   variation: AppState['variation'];
   inversionDefault: AppState['inversionDefault'];
   bpm: number;
@@ -13,6 +14,7 @@ export interface RawGenerationInput {
     index: number;
     modo: AppState['modoDefault'];
     armonizacion: AppState['armonizacionDefault'];
+    octavacion: AppState['octavacionDefault'];
     inversion: AppState['inversionDefault'] | null;
   }[];
   referenceRoot: string;

@@ -77,6 +77,7 @@ export function savePreferences(state: AppState): void {
     clave: state.clave,
     modoDefault: state.modoDefault,
     armonizacionDefault: state.armonizacionDefault,
+    octavacionDefault: state.octavacionDefault,
     variation: state.variation,
     inversionDefault: state.inversionDefault,
     bpm: state.bpm,

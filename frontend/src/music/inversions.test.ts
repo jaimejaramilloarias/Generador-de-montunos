@@ -7,6 +7,7 @@ function buildChord(index: number, name: string, inversion: ChordConfig['inversi
     index,
     name,
     armonizacion: 'Octavas',
+    octavacion: 'Original',
     inversion,
     modo: 'Tradicional',
     isRecognized: true,

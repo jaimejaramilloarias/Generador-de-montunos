@@ -9,7 +9,7 @@ let deleteSavedProgression: (id: string) => void;
 let setDefaultModo: (modo: AppState['modoDefault']) => void;
 let setChord: (
   index: number,
-  patch: Partial<Pick<AppState['chords'][number], 'modo' | 'armonizacion' | 'inversion'>>
+  patch: Partial<Pick<AppState['chords'][number], 'modo' | 'armonizacion' | 'octavacion' | 'inversion'>>
 ) => void;
 
 async function importStore() {

@@ -10,6 +10,7 @@ import {
   setChord,
   setClave,
   setDefaultArmonizacion,
+  setDefaultOctavacion,
   setDefaultInversion,
   setDefaultModo,
   shiftAllInversions,
@@ -27,7 +28,7 @@ import {
   subscribe,
   updateManualEdit,
 } from '../state/store';
-import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
+import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, OCTAVACIONES, VARIACIONES } from '../types/constants';
 import type { AppState, ChordConfig, GenerationResult, MidiStatus, ResolvedChordInversion } from '../types';
 import { CHORD_SUFFIX_SUGGESTIONS, getChordSuffixSuggestions } from '../utils/chordAutocomplete';
 import { isExtendedChordName } from '../utils/chords';
@@ -49,6 +50,7 @@ interface UiRefs {
   claveSelect: HTMLSelectElement;
   modoSelect: HTMLSelectElement;
   armonizacionSelect: HTMLSelectElement;
+  octavacionSelect: HTMLSelectElement;
   inversionSelect: HTMLSelectElement;
   variationSelect: HTMLSelectElement;
   bpmInput: HTMLInputElement;
@@ -296,6 +298,12 @@ function buildLayout(): string {
             </div>
             <div>
               <label class="input-group">
+                <span>Octavación por defecto</span>
+                <select id="octavacion"></select>
+              </label>
+            </div>
+            <div>
+              <label class="input-group">
                 <span>Inversión por defecto</span>
                 <select id="inversion"></select>
               </label>
@@ -318,7 +326,7 @@ function buildLayout(): string {
           <section class="panel__section">
             <header class="panel__section-header">
               <h2>Overrides por acorde</h2>
-              <p>Personaliza modo, armonización e inversión por acorde.</p>
+              <p>Personaliza modo, armonización, octavación e inversión por acorde.</p>
             </header>
             <div class="table-container">
               <table>
@@ -328,6 +336,7 @@ function buildLayout(): string {
                     <th>Acorde</th>
                     <th>Modo</th>
                     <th>Armonización</th>
+                    <th>Octavación</th>
                     <th>Inversión</th>
                     <th>Nota grave</th>
                   </tr>
@@ -425,6 +434,7 @@ function grabRefs(root: HTMLElement): UiRefs {
     claveSelect: root.querySelector<HTMLSelectElement>('#clave')!,
     modoSelect: root.querySelector<HTMLSelectElement>('#modo')!,
     armonizacionSelect: root.querySelector<HTMLSelectElement>('#armonizacion')!,
+    octavacionSelect: root.querySelector<HTMLSelectElement>('#octavacion')!,
     inversionSelect: root.querySelector<HTMLSelectElement>('#inversion')!,
     variationSelect: root.querySelector<HTMLSelectElement>('#variacion')!,
     bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
@@ -481,6 +491,11 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
   populateSelect(refs.armonizacionSelect, ARMONIZACIONES.map((item) => ({ value: item, label: item })));
   refs.armonizacionSelect.addEventListener('change', (event) => {
     setDefaultArmonizacion((event.target as HTMLSelectElement).value as AppState['armonizacionDefault']);
+  });
+
+  populateSelect(refs.octavacionSelect, OCTAVACIONES.map((item) => ({ value: item, label: item })));
+  refs.octavacionSelect.addEventListener('change', (event) => {
+    setDefaultOctavacion((event.target as HTMLSelectElement).value as AppState['octavacionDefault']);
   });
 
   populateSelect(refs.inversionSelect, Object.entries(INVERSIONES).map(([value, label]) => ({ value, label })));
@@ -739,6 +754,9 @@ function updateUi(state: AppState, refs: UiRefs): void {
   if (refs.armonizacionSelect.value !== state.armonizacionDefault) {
     refs.armonizacionSelect.value = state.armonizacionDefault;
   }
+  if (refs.octavacionSelect.value !== state.octavacionDefault) {
+    refs.octavacionSelect.value = state.octavacionDefault;
+  }
   if (refs.inversionSelect.value !== state.inversionDefault) {
     refs.inversionSelect.value = state.inversionDefault;
   }
@@ -819,10 +837,12 @@ function buildChordRow(chord: ChordConfig, resolved?: ResolvedChordInversion): H
 
   const modoCell = document.createElement('td');
   const armonizacionCell = document.createElement('td');
+  const octavacionCell = document.createElement('td');
   const inversionCell = document.createElement('td');
   const bassCell = document.createElement('td');
   row.appendChild(modoCell);
   row.appendChild(armonizacionCell);
+  row.appendChild(octavacionCell);
   row.appendChild(inversionCell);
   row.appendChild(bassCell);
 
@@ -831,6 +851,9 @@ function buildChordRow(chord: ChordConfig, resolved?: ResolvedChordInversion): H
   });
   const armonizacionSelect = createSelect(ARMONIZACIONES, chord.armonizacion, (value) => {
     setChord(chord.index, { armonizacion: value as AppState['armonizacionDefault'] });
+  });
+  const octavacionSelect = createSelect(OCTAVACIONES, chord.octavacion, (value) => {
+    setChord(chord.index, { octavacion: value as AppState['octavacionDefault'] });
   });
   const inversionOptions = [
     { value: '', label: 'Automática' },
@@ -842,6 +865,7 @@ function buildChordRow(chord: ChordConfig, resolved?: ResolvedChordInversion): H
 
   modoCell.appendChild(modoSelect);
   armonizacionCell.appendChild(armonizacionSelect);
+  octavacionCell.appendChild(octavacionSelect);
   inversionCell.appendChild(inversionSelect);
 
   const bassLabel = document.createElement('div');

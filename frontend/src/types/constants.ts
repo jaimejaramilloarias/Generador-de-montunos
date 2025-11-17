@@ -1,4 +1,4 @@
-import type { Armonizacion, Inversion, Modo, Variacion } from './index';
+import type { Armonizacion, Inversion, Modo, Octavacion, Variacion } from './index';
 
 export const CLAVES: Record<string, { label: string; description: string }> = {
   'Clave 2-3': {
@@ -13,6 +13,7 @@ export const CLAVES: Record<string, { label: string; description: string }> = {
 
 export const MODOS: Modo[] = ['Tradicional', 'Extendido', 'Salsa'];
 export const ARMONIZACIONES: Armonizacion[] = ['Octavas', 'Doble octava', 'Décimas', 'Treceavas'];
+export const OCTAVACIONES: Octavacion[] = ['Original', 'Octava arriba', 'Octava abajo'];
 export const VARIACIONES: Variacion[] = ['A', 'B', 'C', 'D'];
 export const INVERSIONES: Record<Inversion, string> = {
   root: 'Fundamental',

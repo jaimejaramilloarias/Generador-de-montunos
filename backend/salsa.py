@@ -58,6 +58,19 @@ RANGO_EXTRA = 4  # flexible extension
 SALTO_MAX = 8  # minor sixth in semitones
 
 
+def _offset_octavacion(label: Optional[str]) -> int:
+    """Return the octave displacement encoded in ``label``."""
+
+    if not label:
+        return 0
+    etiqueta = label.lower().strip()
+    if etiqueta == "octava arriba":
+        return 12
+    if etiqueta == "octava abajo":
+        return -12
+    return 0
+
+
 def _ajustar_rango(pitch: int) -> int:
     """Confine ``pitch`` within ``RANGO_BAJO_MIN`` .. ``RANGO_BAJO_MAX``."""
 
@@ -413,6 +426,8 @@ def montuno_salsa(
     return_pm: bool = False,
     variante: str = "A",   # <-- NUEVO parámetro
     asignaciones_custom: Optional[List[Tuple[str, List[int], str, Optional[str]]]] = None,
+    octavacion_default: Optional[str] = None,
+    octavaciones_custom: Optional[List[str]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Genera montuno estilo salsa enlazando acordes e inversiones.
 
@@ -434,6 +449,10 @@ def montuno_salsa(
             if asignaciones
             else 0
         )
+
+    octavaciones = octavaciones_custom or [octavacion_default or "Original"] * len(
+        asignaciones
+    )
 
     # --------------------------------------------------------------
     # Selección de la inversión para cada acorde enlazando la voz grave
@@ -485,6 +504,10 @@ def montuno_salsa(
             mapa[ix] = i
         limites[i] = idxs[-1] + 1
 
+    offset_octava: Dict[int, int] = {}
+    for i, etiqueta in enumerate(octavaciones):
+        offset_octava[i] = _offset_octavacion(etiqueta)
+
     inv_por_cor: Dict[int, str] = {}
     for idx, (_, idxs, _, _) in enumerate(asignaciones):
         for ix in idxs:
@@ -497,6 +520,7 @@ def montuno_salsa(
             continue
         idx_acorde = mapa[cor]
         acorde, _, _, _ = asignaciones[idx_acorde]
+        octava = offset_octava.get(idx_acorde, 0)
         grupos_act = grupos_por_inv
         ref_idx = (inicio_cor + cor + offset_ref) % total_ref_cor
         for pos in grupos_act[inv][ref_idx]:
@@ -515,7 +539,7 @@ def montuno_salsa(
             notas_finales.append(
                 pretty_midi.Note(
                     velocity=pos["velocity"],
-                    pitch=pitch,
+                    pitch=pitch + octava,
                     start=inicio,
                     end=end,
                 )

@@ -18,6 +18,7 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
     index: chord.index,
     modo: chord.modo,
     armonizacion: chord.armonizacion,
+    octavacion: chord.octavacion,
     inversion: resolvedInversions[idx]?.inversion ?? chord.inversion ?? null,
   }));
   const secondsPerBeat = 60 / state.bpm;
@@ -38,6 +39,7 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
         armonizacionDefault: state.armonizacionDefault,
         variation: state.variation,
         inversionDefault: state.inversionDefault,
+        octavacionDefault: state.octavacionDefault,
         bpm: state.bpm,
         seed,
         chords,
