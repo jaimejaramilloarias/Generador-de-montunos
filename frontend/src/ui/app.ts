@@ -764,11 +764,6 @@ function buildChordRow(chord: ChordConfig): HTMLTableRowElement {
     setChord(chord.index, { inversion: value === '' ? null : (value as AppState['inversionDefault']) });
   });
 
-  if (isExtendedChordName(chord.name)) {
-    modoSelect.value = 'Extendido';
-    modoSelect.disabled = true;
-  }
-
   modoCell.appendChild(modoSelect);
   armonizacionCell.appendChild(armonizacionSelect);
   inversionCell.appendChild(inversionSelect);

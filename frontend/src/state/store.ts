@@ -132,7 +132,7 @@ function buildChords(
 
     if (prev && prev.name === chord.name) {
       const nextInversion = forcedInversion ?? prev.inversion ?? null;
-      const nextModo = isExtended ? 'Extendido' : prev.modo;
+      const nextModo = isExtended ? prev.modo ?? 'Extendido' : prev.modo;
       return {
         ...prev,
         index,
@@ -257,7 +257,7 @@ export function setChord(
       ...patch,
       inversion: patch.inversion === undefined ? chord.inversion : patch.inversion,
     };
-    if (isExtendedChordName(next.name)) {
+    if (isExtendedChordName(next.name) && patch.modo === undefined) {
       next.modo = 'Extendido';
     }
     return next;
