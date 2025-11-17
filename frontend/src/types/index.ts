@@ -12,6 +12,7 @@ export interface ChordConfig {
   armonizacion: Armonizacion;
   octavacion: Octavacion;
   inversion: Inversion | null;
+  registerOffset: number;
   isRecognized: boolean;
 }
 

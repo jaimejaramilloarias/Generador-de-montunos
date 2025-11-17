@@ -3,6 +3,7 @@ import { INVERSION_ORDER } from '../types/constants';
 import { detectIntervals, getChordRootSemitone } from './chords';
 
 const MAX_LEAP = 8; // minor sixth
+const SEMITONES_IN_OCTAVE = 12;
 
 function limitLeap(prev: number | null, pitch: number): number {
   if (prev === null) {
@@ -10,10 +11,10 @@ function limitLeap(prev: number | null, pitch: number): number {
   }
   let result = pitch;
   while (result - prev > MAX_LEAP) {
-    result -= 12;
+    result -= SEMITONES_IN_OCTAVE;
   }
   while (prev - result > MAX_LEAP) {
-    result += 12;
+    result += SEMITONES_IN_OCTAVE;
   }
   return result;
 }
@@ -21,19 +22,19 @@ function limitLeap(prev: number | null, pitch: number): number {
 function inversionBasePitch(chordName: string, inversion: Inversion): number {
   const rootPc = getChordRootSemitone(chordName) ?? 0;
   const intervals = detectIntervals(chordName);
-  const base = rootPc + 12 * 3;
+  const base = rootPc + SEMITONES_IN_OCTAVE * 3;
   const third = intervals[1] ?? 4;
   const fifth = intervals[2] ?? 7;
   const seventh = intervals[3] ?? 10;
 
   if (inversion === 'third') {
-    return ((rootPc + third) % 12) + 12 * 3;
+    return ((rootPc + third) % 12) + SEMITONES_IN_OCTAVE * 3;
   }
   if (inversion === 'fifth') {
-    return ((rootPc + fifth) % 12) + 12 * 3;
+    return ((rootPc + fifth) % 12) + SEMITONES_IN_OCTAVE * 3;
   }
   if (inversion === 'seventh') {
-    return ((rootPc + seventh) % 12) + 12 * 3;
+    return ((rootPc + seventh) % 12) + SEMITONES_IN_OCTAVE * 3;
   }
   return base;
 }
@@ -41,16 +42,23 @@ function inversionBasePitch(chordName: string, inversion: Inversion): number {
 export function calculateBassPitch(
   chordName: string,
   inversion: Inversion,
-  prevPitch: number | null
+  prevPitch: number | null,
+  registerOffset = 0,
+  clampToPrev = true
 ): number {
-  const basePitch = inversionBasePitch(chordName, inversion);
-  return limitLeap(prevPitch, basePitch);
+  const basePitch = inversionBasePitch(chordName, inversion) + registerOffset * SEMITONES_IN_OCTAVE;
+  return clampToPrev ? limitLeap(prevPitch, basePitch) : basePitch;
+}
+
+export function deriveRegisterOffset(chordName: string, inversion: Inversion, pitch: number): number {
+  const base = inversionBasePitch(chordName, inversion);
+  return Math.round((pitch - base) / SEMITONES_IN_OCTAVE);
 }
 
 function nearestPitchForPc(prevPitch: number, pitchClass: number): number {
-  const baseOctave = Math.round((prevPitch - pitchClass) / 12);
-  const centered = pitchClass + 12 * baseOctave;
-  const candidates = [centered - 12, centered, centered + 12];
+  const baseOctave = Math.round((prevPitch - pitchClass) / SEMITONES_IN_OCTAVE);
+  const centered = pitchClass + SEMITONES_IN_OCTAVE * baseOctave;
+  const candidates = [centered - SEMITONES_IN_OCTAVE, centered, centered + SEMITONES_IN_OCTAVE];
 
   return candidates.reduce((best, candidate) => {
     const distance = Math.abs(candidate - prevPitch);
@@ -124,13 +132,13 @@ export function stepInversionPitch(
 ): ResolvedChordInversion {
   const pitchClasses = inversionPitchClasses(chordName);
   const candidates = pitchClasses.map((entry) => {
-    const baseOctave = Math.floor(currentPitch / 12);
+    const baseOctave = Math.floor(currentPitch / SEMITONES_IN_OCTAVE);
     let pitch = entry.pc + 12 * baseOctave;
     if (direction === 1 && pitch <= currentPitch + 1e-6) {
-      pitch += 12;
+      pitch += SEMITONES_IN_OCTAVE;
     }
     if (direction === -1 && pitch >= currentPitch - 1e-6) {
-      pitch -= 12;
+      pitch -= SEMITONES_IN_OCTAVE;
     }
     return { inversion: entry.inversion, pitch } satisfies ResolvedChordInversion;
   });
@@ -156,7 +164,9 @@ export function resolveInversionChain(
   let prevPitch: number | null = null;
   return chords.map((chord, idx) => {
     let chosenInversion = chord.inversion ?? inversionDefault;
-    let pitch = calculateBassPitch(chord.name, chosenInversion, prevPitch);
+    const registerOffset = chord.registerOffset ?? 0;
+    const clampToPrev = chord.inversion === null;
+    let pitch = calculateBassPitch(chord.name, chosenInversion, prevPitch, registerOffset, clampToPrev);
 
     if (chord.inversion === null && idx > 0 && prevPitch !== null) {
       const closestTone = selectNearestChordTone(chord.name, prevPitch);
@@ -165,7 +175,8 @@ export function resolveInversionChain(
       );
 
       chosenInversion = matchingInversion ?? inversionDefault;
-      pitch = limitLeap(prevPitch, closestTone.pitch);
+      const targetPitch = closestTone.pitch + registerOffset * SEMITONES_IN_OCTAVE;
+      pitch = clampToPrev ? limitLeap(prevPitch, targetPitch) : targetPitch;
     }
 
     prevPitch = pitch;
@@ -175,11 +186,12 @@ export function resolveInversionChain(
 
 export function listBassOptions(
   chordName: string,
-  prevPitch: number | null
+  prevPitch: number | null,
+  registerOffset = 0
 ): ResolvedChordInversion[] {
   return INVERSION_ORDER.map((inversion) => ({
     inversion,
-    pitch: calculateBassPitch(chordName, inversion, prevPitch),
+    pitch: calculateBassPitch(chordName, inversion, prevPitch, registerOffset),
   })).sort((a, b) => a.pitch - b.pitch || INVERSION_ORDER.indexOf(a.inversion) - INVERSION_ORDER.indexOf(b.inversion));
 }
 

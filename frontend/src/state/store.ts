@@ -22,7 +22,7 @@ import {
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
 import { isExtendedChordName } from '../utils/chords';
-import { resolveInversionChain, stepInversionPitch } from '../music/inversions';
+import { deriveRegisterOffset, resolveInversionChain, stepInversionPitch } from '../music/inversions';
 
 const listeners = new Set<(state: AppState) => void>();
 
@@ -167,6 +167,7 @@ function buildChords(
         armonizacion,
         octavacion,
         inversion: nextInversion,
+        registerOffset: prev.registerOffset ?? 0,
         isRecognized: chord.isRecognized,
       } satisfies ChordConfig;
     }
@@ -179,6 +180,7 @@ function buildChords(
       armonizacion,
       octavacion: base.octavacionDefault,
       inversion: forcedInversion,
+      registerOffset: 0,
       isRecognized: chord.isRecognized,
     } satisfies ChordConfig;
   });
@@ -271,7 +273,7 @@ export function setDefaultOctavacion(octavacion: AppState['octavacionDefault']):
 
 export function setDefaultInversion(inversion: Inversion): void {
   const chords = state.chords.map((chord) =>
-    chord.inversion === null ? chord : { ...chord, inversion }
+    chord.inversion === null ? chord : { ...chord, inversion, registerOffset: 0 }
   );
   updateState({ inversionDefault: inversion, chords });
   markDirty();
@@ -340,8 +342,9 @@ export function nudgeChordBass(index: number, direction: 1 | -1): void {
     inversion = target.inversion;
   }
 
-  if (inversion !== current.inversion) {
-    setChord(index, { inversion });
+  if (inversion !== current.inversion || chord.registerOffset !== deriveRegisterOffset(chord.name, inversion, pitch)) {
+    const registerOffset = deriveRegisterOffset(chord.name, inversion, pitch);
+    setChord(index, { inversion, registerOffset });
   }
 }
 
@@ -368,11 +371,12 @@ export function shiftAllInversions(delta: number): void {
       inversion = target.inversion;
     }
 
-    if (inversion === chord.inversion) {
+    const registerOffset = deriveRegisterOffset(chord.name, inversion, pitch);
+    if (inversion === chord.inversion && registerOffset === chord.registerOffset) {
       return chord;
     }
 
-    return { ...chord, inversion } satisfies ChordConfig;
+    return { ...chord, inversion, registerOffset } satisfies ChordConfig;
   });
   updateState({ chords });
   markDirty();

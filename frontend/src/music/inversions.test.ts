@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ChordConfig } from '../types';
-import { formatMidiNote, listBassOptions, resolveInversionChain, stepInversionPitch } from './inversions';
+import {
+  calculateBassPitch,
+  formatMidiNote,
+  listBassOptions,
+  resolveInversionChain,
+  stepInversionPitch,
+} from './inversions';
 
 function buildChord(index: number, name: string, inversion: ChordConfig['inversion'] = null): ChordConfig {
   return {
@@ -9,6 +15,7 @@ function buildChord(index: number, name: string, inversion: ChordConfig['inversi
     armonizacion: 'Octavas',
     octavacion: 'Original',
     inversion,
+    registerOffset: 0,
     modo: 'Tradicional',
     isRecognized: true,
   } satisfies ChordConfig;
@@ -53,6 +60,18 @@ describe('resolveInversionChain', () => {
     expect(resolved[0].pitch).toBeGreaterThan(0);
     expect(resolved[1].pitch).toBe(resolved[0].pitch);
     expect(Math.abs(resolved[2].pitch - resolved[1].pitch)).toBeLessThanOrEqual(8);
+  });
+
+  it('mantiene un desplazamiento de registro manual al resolver una cadena', () => {
+    const chords = [
+      { ...buildChord(0, 'Cmaj7', 'root'), registerOffset: 2 },
+      { ...buildChord(1, 'Fmaj7', 'third'), registerOffset: 2 },
+    ];
+
+    const resolved = resolveInversionChain(chords, 'root');
+
+    expect(resolved[0].pitch).toBe(calculateBassPitch('Cmaj7', 'root', null, 2, false));
+    expect(resolved[1].pitch).toBe(calculateBassPitch('Fmaj7', 'third', resolved[0].pitch, 2, false));
   });
 });
 
