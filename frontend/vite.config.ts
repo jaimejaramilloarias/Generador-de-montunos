@@ -1,8 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 
-const DEFAULT_REPO_BASE = 'Generador-de-montunos';
-
 function normalizeBase(value?: string): string | undefined {
   if (!value) {
     return undefined;
@@ -28,7 +26,7 @@ function normalizeBase(value?: string): string | undefined {
 
 export default defineConfig(({ command }) => {
   const envBase = normalizeBase(process.env.GHPAGES_BASE ?? process.env.PUBLIC_URL);
-  const base = command === 'serve' ? '/' : envBase ?? `/${DEFAULT_REPO_BASE}/`;
+  const base = command === 'serve' ? '/' : envBase ?? './';
 
   return {
     root: resolve(__dirname, '.'),

@@ -155,6 +155,10 @@ export function stepInversionPitch(
       pitch -= SEMITONES_IN_OCTAVE;
     }
 
+  }
+
+
+
   const safeCurrent = currentIdx === -1 ? pitchClasses[0] : pitchClasses[currentIdx];
 
   const targetIdx =
@@ -174,7 +178,7 @@ export function stepInversionPitch(
     pitch -= SEMITONES_IN_OCTAVE;
 main
   }
-
+ main
   return { inversion: target.inversion, pitch } satisfies ResolvedChordInversion;
 }
 
