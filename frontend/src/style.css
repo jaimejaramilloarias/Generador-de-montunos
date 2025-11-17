@@ -350,6 +350,31 @@ input[type='number'] {
   color: #ff8686;
 }
 
+.bass-note {
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.bass-controls {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.bass-controls__btn {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.bass-controls__btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

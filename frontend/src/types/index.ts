@@ -13,6 +13,11 @@ export interface ChordConfig {
   isRecognized: boolean;
 }
 
+export interface ResolvedChordInversion {
+  inversion: Inversion;
+  pitch: number;
+}
+
 export interface ManualEditEntry {
   type: ManualEditType;
   startBeats: number;

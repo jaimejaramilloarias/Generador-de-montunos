@@ -5,6 +5,7 @@ import type { RawGenerationResult } from './bridge';
 import { FALLBACK_RAW_RESULT } from './fallbackResult';
 import type { AppState, GenerationResult, NoteEvent } from '../types';
 import { normaliseProgressionText } from '../utils/progression';
+import { resolveInversionChain } from './inversions';
 
 const REFERENCE_ROOT = 'backend/reference_midi_loops';
 
@@ -12,11 +13,12 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
   const baseUrl = typeof import.meta.env.BASE_URL === 'string' ? import.meta.env.BASE_URL : '/';
   const seed = typeof state.seed === 'number' && Number.isFinite(state.seed) ? state.seed : null;
   const progressionNormalised = applyChordReplacements(normaliseProgressionText(state.progressionInput));
-  const chords = state.chords.map((chord) => ({
+  const resolvedInversions = resolveInversionChain(state.chords, state.inversionDefault);
+  const chords = state.chords.map((chord, idx) => ({
     index: chord.index,
     modo: chord.modo,
     armonizacion: chord.armonizacion,
-    inversion: chord.inversion ?? null,
+    inversion: resolvedInversions[idx]?.inversion ?? chord.inversion ?? null,
   }));
   const secondsPerBeat = 60 / state.bpm;
   const manualEdits = (state.manualEdits ?? []).map((edit) => ({
