@@ -369,6 +369,16 @@ export function shiftAllInversions(delta: number): void {
   markDirty();
 }
 
+export function recalculateInversions(): void {
+  const resolved = resolveInversionChain(state.chords, state.inversionDefault);
+  const chords = state.chords.map((chord, index) => ({
+    ...chord,
+    inversion: resolved[index]?.inversion ?? chord.inversion ?? null,
+  }));
+  updateState({ chords });
+  markDirty();
+}
+
 export function addManualEdit(): void {
   const next: ManualEditEntry = { type: 'modify', startBeats: 0, durationBeats: 1, pitch: 60 };
   updateState({ manualEdits: [next, ...state.manualEdits] });

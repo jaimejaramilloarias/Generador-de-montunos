@@ -22,6 +22,7 @@ import {
   setProgression,
   setSeed,
   subscribe,
+  recalculateInversions,
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, MODOS, OCTAVACIONES } from '../types/constants';
 import type { AppState, GenerationResult, MidiStatus } from '../types';
@@ -49,11 +50,13 @@ interface UiRefs {
   claveSelect: HTMLSelectElement;
   modoSelect: HTMLSelectElement;
   armonizacionSelect: HTMLSelectElement;
+  armonizacionContainer: HTMLDivElement;
   octavacionSelect: HTMLSelectElement;
   bpmInput: HTMLInputElement;
   seedInput: HTMLInputElement;
   inversionShiftUpBtn: HTMLButtonElement;
   inversionShiftDownBtn: HTMLButtonElement;
+  recalculateInversionsBtn: HTMLButtonElement;
   generateBtn: HTMLButtonElement;
   playBtn: HTMLButtonElement;
   downloadBtn: HTMLButtonElement;
@@ -177,20 +180,6 @@ async function stopAllPlayback(): Promise<void> {
 
   resetPlayback();
   setIsPlaying(false);
-}
-
-function shiftOctavacion(index: number, direction: 1 | -1): void {
-  const chord = getState().chords[index];
-  if (!chord) {
-    return;
-  }
-  const currentIndex = OCTAVACIONES.indexOf(chord.octavacion);
-  const baseIndex = currentIndex === -1 ? 0 : currentIndex;
-  const targetIndex = Math.min(Math.max(baseIndex + direction, 0), OCTAVACIONES.length - 1);
-  const next = OCTAVACIONES[targetIndex];
-  if (next !== chord.octavacion) {
-    setChord(index, { octavacion: next });
-  }
 }
 
 async function applyMidiSelection(nextId: string | null, options?: { force?: boolean }): Promise<void> {
@@ -382,18 +371,11 @@ export function setupApp(root: HTMLElement): void {
   const refs = grabRefs(root);
   signalViewer = mountSignalViewer(refs.signalViewer, {
     onBassNudge: nudgeChordBass,
-    onOctaveShift: shiftOctavacion,
     onModeChange: (index, modo) => {
       setChord(index, { modo });
     },
     onArmonizacionChange: (index, armonizacion) => {
       setChord(index, { armonizacion });
-    },
-    onOctavacionChange: (index, octavacion) => {
-      setChord(index, { octavacion });
-    },
-    onInversionChange: (index, inversion) => {
-      setChord(index, { inversion });
     },
   });
   bindStaticEvents(refs, root);
@@ -456,6 +438,14 @@ function buildLayout(): string {
                 <button type="button" id="shift-inv-up" class="icon-btn" title="Subir inversiones">⤴</button>
                 <button type="button" id="shift-inv-down" class="icon-btn" title="Bajar inversiones">⤵</button>
               </div>
+              <button
+                type="button"
+                id="recalculate-inversions"
+                class="icon-btn icon-btn--wide"
+                title="Recalcular inversiones para corregir enlaces extraños"
+              >
+                Recalcular inversiones
+              </button>
             </div>
             <div class="signal-embed__cta-group">
               <a
@@ -469,10 +459,10 @@ function buildLayout(): string {
               </a>
             </div>
           </div>
-            <div class="signal-embed__preview signal-embed__preview--full">
-              <div id="signal-viewer" class="signal-viewer"></div>
-              <p class="signal-embed__hint">
-              Se actualiza automáticamente al regenerar o cambiar parámetros. Ajusta modo, armonización, octavación, inversión y nota grave por acorde justo debajo del gráfico.
+          <div class="signal-embed__preview signal-embed__preview--full">
+            <div id="signal-viewer" class="signal-viewer"></div>
+            <p class="signal-embed__hint">
+              Se actualiza automáticamente al regenerar o cambiar parámetros. Ajusta modo, armonización y nota grave por acorde justo debajo del gráfico.
             </p>
           </div>
         </section>
@@ -505,10 +495,12 @@ function buildLayout(): string {
               </label>
             </div>
             <div>
-              <label class="input-group">
-                <span>Armonización por defecto</span>
-                <select id="armonizacion"></select>
-              </label>
+              <div id="armonizacion-default" class="harmonizacion-default">
+                <label class="input-group">
+                  <span>Armonización por defecto</span>
+                  <select id="armonizacion"></select>
+                </label>
+              </div>
             </div>
             <div>
               <label class="input-group">
@@ -572,11 +564,13 @@ function grabRefs(root: HTMLElement): UiRefs {
     claveSelect: root.querySelector<HTMLSelectElement>('#clave')!,
     modoSelect: root.querySelector<HTMLSelectElement>('#modo')!,
     armonizacionSelect: root.querySelector<HTMLSelectElement>('#armonizacion')!,
+    armonizacionContainer: root.querySelector<HTMLDivElement>('#armonizacion-default')!,
     octavacionSelect: root.querySelector<HTMLSelectElement>('#octavacion')!,
     bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
     seedInput: root.querySelector<HTMLInputElement>('#seed')!,
     inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
     inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
+    recalculateInversionsBtn: root.querySelector<HTMLButtonElement>('#recalculate-inversions')!,
     generateBtn: root.querySelector<HTMLButtonElement>('#generate')!,
     playBtn: root.querySelector<HTMLButtonElement>('#play')!,
     downloadBtn: root.querySelector<HTMLButtonElement>('#download')!,
@@ -660,6 +654,10 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
 
   refs.inversionShiftDownBtn.addEventListener('click', () => {
     shiftAllInversions(-1);
+  });
+
+  refs.recalculateInversionsBtn.addEventListener('click', () => {
+    recalculateInversions();
   });
 
   refs.midiEnableBtn.addEventListener('click', async () => {
@@ -873,6 +871,7 @@ function updateUi(state: AppState, refs: UiRefs): void {
   refs.armonizacionSelect.title = armonizacionEnabled
     ? 'Armonización por defecto para modo Tradicional'
     : 'La armonización solo se habilita cuando el modo por defecto es Tradicional';
+  refs.armonizacionContainer.classList.toggle('is-hidden', !armonizacionEnabled);
 
   renderErrors(state.errors, refs);
   renderSummary(state, refs.summary);
@@ -887,6 +886,8 @@ function updateUi(state: AppState, refs: UiRefs): void {
     state.isGenerating || (!state.generated && (progressionEmpty || hasBlockingErrors));
   refs.playBtn.textContent = state.isPlaying ? 'Detener' : 'Reproducir';
   refs.downloadBtn.disabled = state.isGenerating || !state.generated;
+  refs.recalculateInversionsBtn.disabled =
+    state.isGenerating || progressionEmpty || hasBlockingErrors || state.chords.length === 0;
   refs.saveButton.disabled = state.progressionInput.trim().length === 0 || state.errors.length > 0;
   refs.saveButton.textContent = state.activeProgressionId ? 'Actualizar progresión' : 'Guardar progresión';
 
