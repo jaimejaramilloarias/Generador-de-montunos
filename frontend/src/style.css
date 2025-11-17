@@ -482,6 +482,47 @@ input[type='number'] {
   font-size: 0.95rem;
 }
 
+.signal-embed__toolbar {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.35rem 0.45rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.icon-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.icon-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.icon-btn__group {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding-left: 0.35rem;
+  margin-left: 0.35rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .signal-embed__cta-group {
   display: flex;
   gap: 0.5rem;
@@ -703,6 +744,32 @@ input[type='number'] {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+}
+
+.signal-viewer__control-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.45rem;
+}
+
+.signal-viewer__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.signal-viewer__select {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+}
+
+.signal-viewer__field--disabled .signal-viewer__select {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .signal-viewer__control-group {

@@ -2,16 +2,13 @@ import {
   getState,
   deleteSavedProgression,
   loadSavedProgression,
-  removeManualEdit,
   resetPlayback,
   saveCurrentProgression,
-  addManualEdit,
   setBpm,
   setChord,
   setClave,
   setDefaultArmonizacion,
   setDefaultOctavacion,
-  setDefaultInversion,
   setDefaultModo,
   shiftAllInversions,
   nudgeChordBass,
@@ -24,15 +21,12 @@ import {
   setIsGenerating,
   setProgression,
   setSeed,
-  setVariation,
   subscribe,
-  updateManualEdit,
 } from '../state/store';
-import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, OCTAVACIONES, VARIACIONES } from '../types/constants';
-import type { AppState, ChordConfig, GenerationResult, MidiStatus, ResolvedChordInversion } from '../types';
+import { ARMONIZACIONES, CLAVES, MODOS, OCTAVACIONES } from '../types/constants';
+import type { AppState, GenerationResult, MidiStatus } from '../types';
 import { CHORD_SUFFIX_SUGGESTIONS, getChordSuffixSuggestions } from '../utils/chordAutocomplete';
 import { isExtendedChordName } from '../utils/chords';
-import { formatMidiNote, resolveInversionChain } from '../music/inversions';
 import { mountSignalViewer } from './signalViewer';
 
 type GeneratorModule = typeof import('../music/generator');
@@ -56,18 +50,14 @@ interface UiRefs {
   modoSelect: HTMLSelectElement;
   armonizacionSelect: HTMLSelectElement;
   octavacionSelect: HTMLSelectElement;
-  inversionSelect: HTMLSelectElement;
-  variationSelect: HTMLSelectElement;
   bpmInput: HTMLInputElement;
   seedInput: HTMLInputElement;
-  variationRandomBtn: HTMLButtonElement;
   inversionShiftUpBtn: HTMLButtonElement;
   inversionShiftDownBtn: HTMLButtonElement;
   generateBtn: HTMLButtonElement;
   playBtn: HTMLButtonElement;
   downloadBtn: HTMLButtonElement;
   errorList: HTMLDivElement;
-  chordsTable: HTMLTableSectionElement;
   summary: HTMLDivElement;
   signalViewer: HTMLDivElement;
   signalOpenLink: HTMLAnchorElement;
@@ -78,8 +68,6 @@ interface UiRefs {
   midiEnableBtn: HTMLButtonElement;
   midiOutputSelect: HTMLSelectElement;
   midiStatusText: HTMLParagraphElement;
-  manualEditsTable: HTMLTableSectionElement;
-  manualAddButton: HTMLButtonElement;
 }
 
 const MIDI_STATUS_MESSAGES: Record<MidiStatus, string> = {
@@ -395,6 +383,18 @@ export function setupApp(root: HTMLElement): void {
   signalViewer = mountSignalViewer(refs.signalViewer, {
     onBassNudge: nudgeChordBass,
     onOctaveShift: shiftOctavacion,
+    onModeChange: (index, modo) => {
+      setChord(index, { modo });
+    },
+    onArmonizacionChange: (index, armonizacion) => {
+      setChord(index, { armonizacion });
+    },
+    onOctavacionChange: (index, octavacion) => {
+      setChord(index, { octavacion });
+    },
+    onInversionChange: (index, inversion) => {
+      setChord(index, { inversion });
+    },
   });
   bindStaticEvents(refs, root);
   subscribe((state) => {
@@ -423,6 +423,15 @@ function buildLayout(): string {
               <h3>Editor MIDI Signal integrado</h3>
               <p>Visualiza al instante el montuno generado, ajusta cada acorde y mándalo a Signal con un solo clic.</p>
             </div>
+            <div class="signal-embed__toolbar" aria-label="Reproducción y controles avanzados">
+              <button type="button" id="generate" class="icon-btn" title="Generar montuno">⟳</button>
+              <button type="button" id="play" class="icon-btn" title="Reproducir o detener">⏯</button>
+              <button type="button" id="download" class="icon-btn" title="Descargar MIDI" disabled>⬇</button>
+              <div class="icon-btn__group" role="group" aria-label="Desplazar inversiones">
+                <button type="button" id="shift-inv-up" class="icon-btn" title="Subir inversiones">⤴</button>
+                <button type="button" id="shift-inv-down" class="icon-btn" title="Bajar inversiones">⤵</button>
+              </div>
+            </div>
             <div class="signal-embed__cta-group">
               <a
                 id="signal-open"
@@ -435,10 +444,10 @@ function buildLayout(): string {
               </a>
             </div>
           </div>
-          <div class="signal-embed__preview signal-embed__preview--full">
-            <div id="signal-viewer" class="signal-viewer"></div>
-            <p class="signal-embed__hint">
-              Se actualiza automáticamente al regenerar, cambiar modo, inversión u octava. Ajusta la nota grave y la octavación por acorde justo debajo del gráfico.
+            <div class="signal-embed__preview signal-embed__preview--full">
+              <div id="signal-viewer" class="signal-viewer"></div>
+              <p class="signal-embed__hint">
+              Se actualiza automáticamente al regenerar o cambiar parámetros. Ajusta modo, armonización, octavación, inversión y nota grave por acorde justo debajo del gráfico.
             </p>
           </div>
         </section>
@@ -482,18 +491,6 @@ function buildLayout(): string {
                 <select id="octavacion"></select>
               </label>
             </div>
-            <div>
-              <label class="input-group">
-                <span>Inversión por defecto</span>
-                <select id="inversion"></select>
-              </label>
-            </div>
-            <div>
-              <label class="input-group">
-                <span>Variación</span>
-                <select id="variacion"></select>
-              </label>
-            </div>
             <div class="input-group">
               <label for="bpm">Tempo</label>
               <input id="bpm" type="number" min="60" max="220" step="1" />
@@ -503,65 +500,6 @@ function buildLayout(): string {
               <input id="seed" type="number" min="0" placeholder="Aleatorio" />
             </div>
           </fieldset>
-          <section class="panel__section">
-            <header class="panel__section-header">
-              <h2>Overrides por acorde</h2>
-              <p>Personaliza modo, armonización, octavación e inversión por acorde.</p>
-            </header>
-            <div class="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Acorde</th>
-                    <th>Modo</th>
-                    <th>Armonización</th>
-                    <th>Octavación</th>
-                    <th>Inversión</th>
-                    <th>Nota grave</th>
-                  </tr>
-                </thead>
-                <tbody id="chords"></tbody>
-              </table>
-            </div>
-          </section>
-          <section class="panel__section">
-            <header class="panel__section-header">
-              <h2>Controles avanzados</h2>
-              <p>Recrea los accesos directos de la app original para variaciones e inversiones.</p>
-            </header>
-            <div class="advanced-controls">
-              <button type="button" id="variation-random" class="btn">Generar variación</button>
-              <div class="advanced-controls__group" role="group" aria-label="Desplazar inversiones">
-                <button type="button" id="shift-inv-up" class="btn" title="Subir inversiones">Inversiones ↑</button>
-                <button type="button" id="shift-inv-down" class="btn" title="Bajar inversiones">Inversiones ↓</button>
-              </div>
-            </div>
-          </section>
-          <section class="panel__section">
-            <header class="panel__section-header">
-              <h2>Ediciones manuales</h2>
-              <p>Aplica correcciones puntuales (añadir, mover o borrar notas) antes de exportar.</p>
-            </header>
-            <div class="manual-edits__actions">
-              <button type="button" id="manual-add" class="btn">Añadir edición</button>
-              <p class="panel__hint">Las posiciones se expresan en beats; el BPM actual define la duración real.</p>
-            </div>
-            <div class="table-container table-container--compact">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Tipo</th>
-                    <th>Inicio (beats)</th>
-                    <th>Duración (beats)</th>
-                    <th>Nota MIDI</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="manual-edits"></tbody>
-              </table>
-            </div>
-          </section>
           <section class="panel__section">
             <header class="panel__section-header">
               <h2>Conexión MIDI</h2>
@@ -590,11 +528,6 @@ function buildLayout(): string {
             <ul id="saved-progressions" class="saved-list" aria-live="polite"></ul>
           </section>
           <section class="panel__section panel__section--actions">
-            <div class="actions">
-              <button type="submit" id="generate" class="btn btn--primary">Generar montuno</button>
-              <button type="button" id="play" class="btn">Reproducir</button>
-              <button type="button" id="download" class="btn" disabled>Descargar MIDI</button>
-            </div>
           </section>
         </form>
         <aside class="summary" aria-live="polite">
@@ -615,18 +548,14 @@ function grabRefs(root: HTMLElement): UiRefs {
     modoSelect: root.querySelector<HTMLSelectElement>('#modo')!,
     armonizacionSelect: root.querySelector<HTMLSelectElement>('#armonizacion')!,
     octavacionSelect: root.querySelector<HTMLSelectElement>('#octavacion')!,
-    inversionSelect: root.querySelector<HTMLSelectElement>('#inversion')!,
-    variationSelect: root.querySelector<HTMLSelectElement>('#variacion')!,
     bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
     seedInput: root.querySelector<HTMLInputElement>('#seed')!,
-    variationRandomBtn: root.querySelector<HTMLButtonElement>('#variation-random')!,
     inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
     inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
     generateBtn: root.querySelector<HTMLButtonElement>('#generate')!,
     playBtn: root.querySelector<HTMLButtonElement>('#play')!,
     downloadBtn: root.querySelector<HTMLButtonElement>('#download')!,
     errorList: root.querySelector<HTMLDivElement>('#errors')!,
-    chordsTable: root.querySelector<HTMLTableSectionElement>('#chords')!,
     summary: root.querySelector<HTMLDivElement>('#summary-content')!,
     signalViewer: root.querySelector<HTMLDivElement>('#signal-viewer')!,
     signalOpenLink: root.querySelector<HTMLAnchorElement>('#signal-open')!,
@@ -637,8 +566,6 @@ function grabRefs(root: HTMLElement): UiRefs {
     midiEnableBtn: root.querySelector<HTMLButtonElement>('#midi-enable')!,
     midiOutputSelect: root.querySelector<HTMLSelectElement>('#midi-output')!,
     midiStatusText: root.querySelector<HTMLParagraphElement>('#midi-status')!,
-    manualEditsTable: root.querySelector<HTMLTableSectionElement>('#manual-edits')!,
-    manualAddButton: root.querySelector<HTMLButtonElement>('#manual-add')!,
   };
 }
 
@@ -680,16 +607,6 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     setDefaultOctavacion((event.target as HTMLSelectElement).value as AppState['octavacionDefault']);
   });
 
-  populateSelect(refs.inversionSelect, Object.entries(INVERSIONES).map(([value, label]) => ({ value, label })));
-  refs.inversionSelect.addEventListener('change', (event) => {
-    setDefaultInversion((event.target as HTMLSelectElement).value as AppState['inversionDefault']);
-  });
-
-  populateSelect(refs.variationSelect, VARIACIONES.map((value) => ({ value, label: value })));
-  refs.variationSelect.addEventListener('change', (event) => {
-    setVariation((event.target as HTMLSelectElement).value as AppState['variation']);
-  });
-
   refs.bpmInput.addEventListener('change', (event) => {
     const value = Number.parseFloat((event.target as HTMLInputElement).value);
     const bpm = Number.isFinite(value) ? Math.min(220, Math.max(60, value)) : 120;
@@ -710,12 +627,6 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     } else {
       setSeed(seed);
     }
-  });
-
-  refs.variationRandomBtn.addEventListener('click', async () => {
-    const randomSeed = crypto?.getRandomValues ? crypto.getRandomValues(new Uint32Array(1))[0] : Math.floor(Math.random() * 1e9);
-    setSeed(randomSeed);
-    await handleGenerate(refs);
   });
 
   refs.inversionShiftUpBtn.addEventListener('click', () => {
@@ -782,6 +693,10 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     await handleGenerate(refs);
   });
 
+  refs.generateBtn.addEventListener('click', async () => {
+    await handleGenerate(refs);
+  });
+
   refs.playBtn.addEventListener('click', () => {
     void togglePlayback(refs);
   });
@@ -817,25 +732,31 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
   });
 
   refs.signalOpenLink.addEventListener('click', async (event) => {
+    event.preventDefault();
     const state = getState();
     if (!state.generated) {
-      event.preventDefault();
       return;
     }
-    if (!('clipboard' in navigator) || !('write' in navigator.clipboard)) {
-      return;
-    }
+
+    const openSignal = (): void => {
+      window.open(refs.signalOpenLink.href, '_blank', 'noopener,noreferrer');
+    };
+
     try {
       const { generateMidiBlob } = await getMidiExportModule();
       const blob = generateMidiBlob(state.generated);
-      await navigator.clipboard.write([new ClipboardItem({ 'audio/midi': blob })]);
-      refs.signalOpenLink.dataset.tooltip = 'MIDI copiado al portapapeles para Signal';
-      window.setTimeout(() => {
-        delete refs.signalOpenLink.dataset.tooltip;
-      }, 2500);
+      if ('clipboard' in navigator && 'write' in navigator.clipboard) {
+        await navigator.clipboard.write([new ClipboardItem({ 'audio/midi': blob })]);
+        refs.signalOpenLink.dataset.tooltip = 'MIDI actualizado listo en Signal';
+        window.setTimeout(() => {
+          delete refs.signalOpenLink.dataset.tooltip;
+        }, 2500);
+      }
     } catch (error) {
-      console.warn('No se pudo copiar el MIDI al portapapeles.', error);
+      console.warn('No se pudo preparar el envío a Signal.', error);
     }
+
+    openSignal();
   });
 
   refs.saveButton.addEventListener('click', () => {
@@ -847,10 +768,6 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
       event.preventDefault();
       refs.saveButton.click();
     }
-  });
-
-  refs.manualAddButton.addEventListener('click', () => {
-    addManualEdit();
   });
 }
 
@@ -921,24 +838,22 @@ function updateUi(state: AppState, refs: UiRefs): void {
   if (refs.octavacionSelect.value !== state.octavacionDefault) {
     refs.octavacionSelect.value = state.octavacionDefault;
   }
-  if (refs.inversionSelect.value !== state.inversionDefault) {
-    refs.inversionSelect.value = state.inversionDefault;
-  }
-  if (refs.variationSelect.value !== state.variation) {
-    refs.variationSelect.value = state.variation;
-  }
   if (Number.parseFloat(refs.bpmInput.value) !== state.bpm) {
     refs.bpmInput.value = String(state.bpm);
   }
   refs.seedInput.value = state.seed === null || Number.isNaN(state.seed) ? '' : String(state.seed);
 
-  renderChordRows(state, refs.chordsTable);
+  const armonizacionEnabled = state.modoDefault === 'Tradicional';
+  refs.armonizacionSelect.disabled = !armonizacionEnabled;
+  refs.armonizacionSelect.title = armonizacionEnabled
+    ? 'Armonización por defecto para modo Tradicional'
+    : 'La armonización solo se habilita cuando el modo por defecto es Tradicional';
+
   renderErrors(state.errors, refs);
   renderSummary(state, refs.summary);
   renderSignalArea(state, refs);
   renderSavedProgressions(state, refs);
   renderMidi(state, refs);
-  renderManualEdits(state, refs);
 
   const progressionEmpty = state.progressionInput.trim().length === 0;
   const hasBlockingErrors = state.errors.length > 0;
@@ -967,120 +882,6 @@ function populateSelect(select: HTMLSelectElement, options: { value: string; lab
   select.innerHTML = options
     .map((option) => `<option value="${option.value}">${option.label}</option>`)
     .join('');
-}
-
-function renderChordRows(state: AppState, tbody: HTMLTableSectionElement): void {
-  tbody.innerHTML = '';
-  const resolved = resolveInversionChain(state.chords, state.inversionDefault);
-  state.chords.forEach((chord) => {
-    tbody.appendChild(buildChordRow(chord, resolved[chord.index]));
-  });
-}
-
-function applyChordValidityStyles(cell: HTMLTableCellElement, isRecognized: boolean): void {
-  cell.classList.add('chord-cell');
-  if (isRecognized) {
-    cell.classList.remove('chord-cell--invalid');
-    cell.removeAttribute('title');
-  } else {
-    cell.classList.add('chord-cell--invalid');
-    cell.title = 'Cifrado no reconocido';
-  }
-}
-
-function buildChordRow(chord: ChordConfig, resolved?: ResolvedChordInversion): HTMLTableRowElement {
-  const row = document.createElement('tr');
-
-  const indexCell = document.createElement('td');
-  indexCell.textContent = String(chord.index + 1);
-  row.appendChild(indexCell);
-
-  const nameCell = document.createElement('td');
-  nameCell.textContent = chord.name;
-  applyChordValidityStyles(nameCell, chord.isRecognized);
-  row.appendChild(nameCell);
-
-  const modoCell = document.createElement('td');
-  const armonizacionCell = document.createElement('td');
-  const octavacionCell = document.createElement('td');
-  const inversionCell = document.createElement('td');
-  const bassCell = document.createElement('td');
-  row.appendChild(modoCell);
-  row.appendChild(armonizacionCell);
-  row.appendChild(octavacionCell);
-  row.appendChild(inversionCell);
-  row.appendChild(bassCell);
-
-  const modoSelect = createSelect(MODOS, chord.modo, (value) => {
-    setChord(chord.index, { modo: value as AppState['modoDefault'] });
-  });
-  const armonizacionSelect = createSelect(ARMONIZACIONES, chord.armonizacion, (value) => {
-    setChord(chord.index, { armonizacion: value as AppState['armonizacionDefault'] });
-  });
-  const octavacionSelect = createSelect(OCTAVACIONES, chord.octavacion, (value) => {
-    setChord(chord.index, { octavacion: value as AppState['octavacionDefault'] });
-  });
-  const inversionOptions = [
-    { value: '', label: 'Automática' },
-    ...Object.entries(INVERSIONES).map(([value, label]) => ({ value, label })),
-  ];
-  const inversionSelect = createSelect(inversionOptions, chord.inversion ?? '', (value) => {
-    setChord(chord.index, { inversion: value === '' ? null : (value as AppState['inversionDefault']) });
-  });
-
-  modoCell.appendChild(modoSelect);
-  armonizacionCell.appendChild(armonizacionSelect);
-  octavacionCell.appendChild(octavacionSelect);
-  inversionCell.appendChild(inversionSelect);
-
-  const bassLabel = document.createElement('div');
-  bassLabel.classList.add('bass-note');
-  bassLabel.textContent = resolved ? formatMidiNote(resolved.pitch) : '—';
-
-  const bassControls = document.createElement('div');
-  bassControls.classList.add('bass-controls');
-
-  const bassUp = document.createElement('button');
-  bassUp.type = 'button';
-  bassUp.classList.add('bass-controls__btn');
-  bassUp.textContent = '↑';
-  bassUp.title = 'Subir nota grave';
-  bassUp.addEventListener('click', () => nudgeChordBass(chord.index, 1));
-
-  const bassDown = document.createElement('button');
-  bassDown.type = 'button';
-  bassDown.classList.add('bass-controls__btn');
-  bassDown.textContent = '↓';
-  bassDown.title = 'Bajar nota grave';
-  bassDown.addEventListener('click', () => nudgeChordBass(chord.index, -1));
-
-  bassControls.append(bassUp, bassDown);
-  bassCell.append(bassLabel, bassControls);
-
-  return row;
-}
-
-function createSelect(
-  options: string[] | { value: string; label: string }[],
-  value: string,
-  onChange: (value: string) => void
-): HTMLSelectElement {
-  const select = document.createElement('select');
-  const entries =
-    Array.isArray(options) && options.length > 0 && typeof options[0] === 'string'
-      ? (options as string[]).map((option) => ({ value: option, label: option }))
-      : (options as { value: string; label: string }[]);
-  entries.forEach((option) => {
-    const opt = document.createElement('option');
-    opt.value = option.value;
-    opt.textContent = option.label;
-    select.appendChild(opt);
-  });
-  select.value = value;
-  select.addEventListener('change', (event) => {
-    onChange((event.target as HTMLSelectElement).value);
-  });
-  return select;
 }
 
 function renderErrors(errors: string[], refs: UiRefs): void {
@@ -1120,7 +921,6 @@ function renderSummary(state: AppState, container: HTMLDivElement): void {
     <p><strong>Duración estimada:</strong> ${generated.durationSeconds.toFixed(2)} s</p>
     <p><strong>Modo resultante:</strong> ${generated.modoTag}</p>
     <p><strong>Clave resultante:</strong> ${generated.claveTag}</p>
-    <p><strong>Variación seleccionada:</strong> ${state.variation}</p>
     <p><strong>Clave seleccionada:</strong> ${state.clave}</p>
     ${referencesHtml}
   `;
@@ -1209,97 +1009,6 @@ function renderSavedProgressions(state: AppState, refs: UiRefs): void {
     actions.append(loadButton, deleteButton);
     entry.append(info, actions);
     list.appendChild(entry);
-  });
-}
-
-function renderManualEdits(state: AppState, refs: UiRefs): void {
-  const tbody = refs.manualEditsTable;
-  tbody.innerHTML = '';
-
-  if (!state.manualEdits.length) {
-    const empty = document.createElement('tr');
-    const cell = document.createElement('td');
-    cell.colSpan = 5;
-    cell.textContent = 'Aún no hay ediciones manuales.';
-    empty.appendChild(cell);
-    tbody.appendChild(empty);
-    return;
-  }
-
-  state.manualEdits.forEach((entry, index) => {
-    const row = document.createElement('tr');
-
-    const typeCell = document.createElement('td');
-    const select = document.createElement('select');
-    ['modify', 'add', 'delete'].forEach((value) => {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent =
-        value === 'modify' ? 'Modificar' : value === 'add' ? 'Añadir' : 'Eliminar';
-      select.appendChild(option);
-    });
-    select.value = entry.type;
-    select.addEventListener('change', (event) => {
-      updateManualEdit(index, { type: (event.target as HTMLSelectElement).value as AppState['manualEdits'][number]['type'] });
-    });
-    typeCell.appendChild(select);
-
-    const startCell = document.createElement('td');
-    const startInput = document.createElement('input');
-    startInput.type = 'number';
-    startInput.step = '0.25';
-    startInput.min = '0';
-    startInput.value = entry.startBeats.toString();
-    startInput.addEventListener('change', (event) => {
-      const value = Number.parseFloat((event.target as HTMLInputElement).value);
-      if (!Number.isFinite(value) || value < 0) {
-        return;
-      }
-      updateManualEdit(index, { startBeats: value });
-    });
-    startCell.appendChild(startInput);
-
-    const durationCell = document.createElement('td');
-    const durationInput = document.createElement('input');
-    durationInput.type = 'number';
-    durationInput.step = '0.25';
-    durationInput.min = '0.125';
-    durationInput.value = entry.durationBeats.toString();
-    durationInput.addEventListener('change', (event) => {
-      const value = Number.parseFloat((event.target as HTMLInputElement).value);
-      if (!Number.isFinite(value) || value <= 0) {
-        return;
-      }
-      updateManualEdit(index, { durationBeats: value });
-    });
-    durationCell.appendChild(durationInput);
-
-    const pitchCell = document.createElement('td');
-    const pitchInput = document.createElement('input');
-    pitchInput.type = 'number';
-    pitchInput.step = '1';
-    pitchInput.min = '1';
-    pitchInput.max = '127';
-    pitchInput.value = entry.pitch.toString();
-    pitchInput.addEventListener('change', (event) => {
-      const value = Number.parseInt((event.target as HTMLInputElement).value, 10);
-      if (!Number.isFinite(value) || value <= 0 || value > 127) {
-        return;
-      }
-      updateManualEdit(index, { pitch: value });
-    });
-    pitchCell.appendChild(pitchInput);
-
-    const actionsCell = document.createElement('td');
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.className = 'btn btn--ghost';
-    deleteBtn.textContent = '✕';
-    deleteBtn.addEventListener('click', () => removeManualEdit(index));
-    actionsCell.appendChild(deleteBtn);
-
-    row.append(typeCell, startCell, durationCell, pitchCell, actionsCell);
-    tbody.appendChild(row);
   });
 }
 
