@@ -11,6 +11,7 @@ let setChord: (
   index: number,
   patch: Partial<Pick<AppState['chords'][number], 'modo' | 'armonizacion' | 'octavacion' | 'inversion'>>
 ) => void;
+let recalculateInversions: () => void;
 
 async function importStore() {
   const store = await import('./store');
@@ -21,6 +22,7 @@ async function importStore() {
   deleteSavedProgression = store.deleteSavedProgression;
   setDefaultModo = store.setDefaultModo;
   setChord = store.setChord;
+  recalculateInversions = store.recalculateInversions;
 }
 
 describe('state/store saved progressions', () => {
@@ -106,5 +108,15 @@ describe('state/store saved progressions', () => {
     expect(state.chords[0]?.modo).toBe('Tradicional');
     expect(state.chords[1]?.modo).toBe('Extendido');
     expect(state.chords[2]?.modo).toBe('Salsa');
+  });
+
+  it('recalcular inversiones restablece los enlaces ignorando overrides manuales', () => {
+    setProgression('Cmaj7 F7');
+    setChord(0, { inversion: 'seventh' });
+
+    recalculateInversions();
+
+    const state = getState();
+    expect(state.chords[0]?.inversion).toBe('root');
   });
 });

@@ -103,6 +103,52 @@ function selectClosestInversion(chordName: string, prevPitch: number | null): Re
   return { inversion: best.inversion, pitch: best.pitch };
 }
 
+function inversionPitchClasses(chordName: string): { inversion: Inversion; pc: number }[] {
+  const seen = new Set<number>();
+  return INVERSION_ORDER.map((inversion) => {
+    const pc = ((inversionBasePitch(chordName, inversion) % 12) + 12) % 12;
+    return { inversion, pc };
+  }).filter((entry) => {
+    if (seen.has(entry.pc)) {
+      return false;
+    }
+    seen.add(entry.pc);
+    return true;
+  });
+}
+
+export function stepInversionPitch(
+  chordName: string,
+  currentPitch: number,
+  direction: 1 | -1
+): ResolvedChordInversion {
+  const pitchClasses = inversionPitchClasses(chordName);
+  const candidates = pitchClasses.map((entry) => {
+    const baseOctave = Math.floor(currentPitch / 12);
+    let pitch = entry.pc + 12 * baseOctave;
+    if (direction === 1 && pitch <= currentPitch + 1e-6) {
+      pitch += 12;
+    }
+    if (direction === -1 && pitch >= currentPitch - 1e-6) {
+      pitch -= 12;
+    }
+    return { inversion: entry.inversion, pitch } satisfies ResolvedChordInversion;
+  });
+
+  const selected =
+    direction === 1
+      ? candidates.reduce<ResolvedChordInversion | null>(
+          (best, candidate) => (best === null || candidate.pitch < best.pitch ? candidate : best),
+          null
+        )
+      : candidates.reduce<ResolvedChordInversion | null>(
+          (best, candidate) => (best === null || candidate.pitch > best.pitch ? candidate : best),
+          null
+        );
+
+  return selected ?? candidates[0];
+}
+
 export function resolveInversionChain(
   chords: ChordConfig[],
   inversionDefault: Inversion
