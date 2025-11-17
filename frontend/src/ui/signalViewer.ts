@@ -1,8 +1,13 @@
-import type { ChordConfig, GenerationResult, NoteEvent } from '../types';
+import { ARMONIZACIONES, INVERSIONES, MODOS, OCTAVACIONES } from '../types/constants';
+import type { Armonizacion, ChordConfig, GenerationResult, Inversion, Modo, NoteEvent, Octavacion } from '../types';
 
 interface ViewerActions {
   onBassNudge?: (index: number, direction: 1 | -1) => void;
   onOctaveShift?: (index: number, direction: 1 | -1) => void;
+  onModeChange?: (index: number, mode: Modo) => void;
+  onArmonizacionChange?: (index: number, armonizacion: Armonizacion) => void;
+  onOctavacionChange?: (index: number, octavacion: Octavacion) => void;
+  onInversionChange?: (index: number, inversion: Inversion | null) => void;
 }
 
 interface ViewerState {
@@ -237,7 +242,52 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
 
       const metaRow = document.createElement('div');
       metaRow.className = 'signal-viewer__chord-meta';
-      metaRow.textContent = chord.octavacion;
+      metaRow.textContent = `${chord.octavacion} · ${chord.modo}`;
+
+      const primaryControls = document.createElement('div');
+      primaryControls.className = 'signal-viewer__control-row';
+
+      const modoField = buildSelectField('Modo', MODOS, chord.modo, (value) => {
+        actions.onModeChange?.(chord.index, value as Modo);
+      });
+      const armonizacionField = buildSelectField(
+        'Armonización',
+        ARMONIZACIONES,
+        chord.armonizacion,
+        (value) => {
+          actions.onArmonizacionChange?.(chord.index, value as Armonizacion);
+        }
+      );
+      const armonizacionDisabled = chord.modo !== 'Tradicional';
+      armonizacionField.select.disabled = armonizacionDisabled;
+      armonizacionField.wrapper.classList.toggle('signal-viewer__field--disabled', armonizacionDisabled);
+      armonizacionField.select.title = armonizacionDisabled
+        ? 'La armonización solo está disponible en modo Tradicional'
+        : 'Armonización por acorde';
+
+      primaryControls.append(modoField.wrapper, armonizacionField.wrapper);
+
+      const secondaryControls = document.createElement('div');
+      secondaryControls.className = 'signal-viewer__control-row';
+
+      const octavacionField = buildSelectField(
+        'Octavación',
+        OCTAVACIONES,
+        chord.octavacion,
+        (value) => {
+          actions.onOctavacionChange?.(chord.index, value as Octavacion);
+        }
+      );
+      const inversionOptions = [
+        { value: '', label: 'Automática' },
+        ...Object.entries(INVERSIONES).map(([value, label]) => ({ value, label })),
+      ];
+      const inversionField = buildSelectField('Inversión', inversionOptions, chord.inversion ?? '', (value) => {
+        const next = value === '' ? null : (value as Inversion);
+        actions.onInversionChange?.(chord.index, next);
+      });
+
+      secondaryControls.append(octavacionField.wrapper, inversionField.wrapper);
 
       const actionsRow = document.createElement('div');
       actionsRow.className = 'signal-viewer__chord-actions';
@@ -261,7 +311,7 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
       octaveGroup.append(octaveLabel, octaveDown, octaveUp);
 
       actionsRow.append(bassGroup, octaveGroup);
-      card.append(name, metaRow, actionsRow);
+      card.append(name, metaRow, primaryControls, secondaryControls, actionsRow);
       grid.appendChild(card);
     });
 
@@ -276,5 +326,37 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
     button.title = title;
     button.addEventListener('click', onClick);
     return button;
+  }
+
+  function buildSelectField(
+    label: string,
+    options: string[] | { value: string; label: string }[],
+    value: string,
+    onChange: (next: string) => void
+  ): { wrapper: HTMLDivElement; select: HTMLSelectElement } {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'signal-viewer__field';
+
+    const tag = document.createElement('span');
+    tag.className = 'signal-viewer__tag';
+    tag.textContent = label;
+
+    const select = document.createElement('select');
+    select.className = 'signal-viewer__select';
+    const entries =
+      Array.isArray(options) && typeof options[0] === 'string'
+        ? (options as string[]).map((option) => ({ value: option, label: option }))
+        : (options as { value: string; label: string }[]);
+    entries.forEach((option) => {
+      const opt = document.createElement('option');
+      opt.value = option.value;
+      opt.textContent = option.label;
+      select.appendChild(opt);
+    });
+    select.value = value;
+    select.addEventListener('change', (event) => onChange((event.target as HTMLSelectElement).value));
+
+    wrapper.append(tag, select);
+    return { wrapper, select };
   }
 }
