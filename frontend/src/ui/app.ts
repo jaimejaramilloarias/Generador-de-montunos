@@ -33,6 +33,7 @@ import type { AppState, ChordConfig, GenerationResult, MidiStatus, ResolvedChord
 import { CHORD_SUFFIX_SUGGESTIONS, getChordSuffixSuggestions } from '../utils/chordAutocomplete';
 import { isExtendedChordName } from '../utils/chords';
 import { formatMidiNote, resolveInversionChain } from '../music/inversions';
+import { mountSignalViewer } from './signalViewer';
 
 type GeneratorModule = typeof import('../music/generator');
 type AudioModule = typeof import('../audio/player');
@@ -47,6 +48,7 @@ let midiOutputsUnsubscribe: (() => void) | null = null;
 let previousState: AppState | null = null;
 let autoGenerateHandle: number | null = null;
 let hasRenderedOnce = false;
+let signalViewer: ReturnType<typeof mountSignalViewer> | null = null;
 
 interface UiRefs {
   progressionInput: HTMLTextAreaElement;
@@ -67,6 +69,10 @@ interface UiRefs {
   errorList: HTMLDivElement;
   chordsTable: HTMLTableSectionElement;
   summary: HTMLDivElement;
+  signalViewer: HTMLDivElement;
+  signalDownloadBtn: HTMLButtonElement;
+  signalOpenLink: HTMLAnchorElement;
+  signalFrame: HTMLIFrameElement;
   saveNameInput: HTMLInputElement;
   saveButton: HTMLButtonElement;
   savedList: HTMLUListElement;
@@ -374,6 +380,7 @@ let lastActiveProgressionId: string | null = null;
 export function setupApp(root: HTMLElement): void {
   root.innerHTML = buildLayout();
   const refs = grabRefs(root);
+  signalViewer = mountSignalViewer(refs.signalViewer);
   bindStaticEvents(refs, root);
   subscribe((state) => {
     updateUi(state, refs);
@@ -556,25 +563,38 @@ function buildLayout(): string {
           <section class="signal-embed" aria-label="Editor MIDI Signal">
             <div class="signal-embed__header">
               <div>
-                <h3>Editar en Signal</h3>
-                <p>Descarga el MIDI generado y arrástralo al editor para visualizarlo o editarlo.</p>
+                <h3>Editor MIDI Signal integrado</h3>
+                <p>Visualiza al instante el montuno generado y mándalo a Signal con un solo clic.</p>
               </div>
-              <a
-                class="btn signal-embed__cta"
-                href="https://signalmidi.app/edit"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Abrir en pestaña nueva
-              </a>
+              <div class="signal-embed__cta-group">
+                <button type="button" id="signal-download" class="btn btn--ghost">Descargar MIDI</button>
+                <a
+                  id="signal-open"
+                  class="btn signal-embed__cta"
+                  href="https://signalmidi.app/edit"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Abrir Signal
+                </a>
+              </div>
             </div>
-            <div class="signal-embed__frame">
-              <iframe
-                title="Editor MIDI Signal"
-                src="https://signalmidi.app/edit"
-                loading="lazy"
-                allow="clipboard-read; clipboard-write"
-              ></iframe>
+            <div class="signal-embed__grid">
+              <div class="signal-embed__preview">
+                <div id="signal-viewer" class="signal-viewer"></div>
+                <p class="signal-embed__hint">
+                  Se actualiza automáticamente al regenerar, cambiar modo, inversión u octava.
+                </p>
+              </div>
+              <div class="signal-embed__frame">
+                <iframe
+                  id="signal-iframe"
+                  title="Editor MIDI Signal"
+                  src="https://signalmidi.app/edit"
+                  loading="lazy"
+                  allow="clipboard-read; clipboard-write"
+                ></iframe>
+              </div>
             </div>
           </section>
         </aside>
@@ -603,6 +623,10 @@ function grabRefs(root: HTMLElement): UiRefs {
     errorList: root.querySelector<HTMLDivElement>('#errors')!,
     chordsTable: root.querySelector<HTMLTableSectionElement>('#chords')!,
     summary: root.querySelector<HTMLDivElement>('#summary-content')!,
+    signalViewer: root.querySelector<HTMLDivElement>('#signal-viewer')!,
+    signalDownloadBtn: root.querySelector<HTMLButtonElement>('#signal-download')!,
+    signalOpenLink: root.querySelector<HTMLAnchorElement>('#signal-open')!,
+    signalFrame: root.querySelector<HTMLIFrameElement>('#signal-iframe')!,
     saveNameInput: root.querySelector<HTMLInputElement>('#saved-name')!,
     saveButton: root.querySelector<HTMLButtonElement>('#save-progression')!,
     savedList: root.querySelector<HTMLUListElement>('#saved-progressions')!,
@@ -789,6 +813,32 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     window.setTimeout(() => URL.revokeObjectURL(url), 2000);
   });
 
+  refs.signalDownloadBtn.addEventListener('click', () => {
+    refs.downloadBtn.click();
+  });
+
+  refs.signalOpenLink.addEventListener('click', async (event) => {
+    const state = getState();
+    if (!state.generated) {
+      event.preventDefault();
+      return;
+    }
+    if (!('clipboard' in navigator) || !('write' in navigator.clipboard)) {
+      return;
+    }
+    try {
+      const { generateMidiBlob } = await getMidiExportModule();
+      const blob = generateMidiBlob(state.generated);
+      await navigator.clipboard.write([new ClipboardItem({ 'audio/midi': blob })]);
+      refs.signalOpenLink.dataset.tooltip = 'MIDI copiado al portapapeles para Signal';
+      window.setTimeout(() => {
+        delete refs.signalOpenLink.dataset.tooltip;
+      }, 2500);
+    } catch (error) {
+      console.warn('No se pudo copiar el MIDI al portapapeles.', error);
+    }
+  });
+
   refs.saveButton.addEventListener('click', () => {
     saveCurrentProgression(refs.saveNameInput.value);
   });
@@ -886,6 +936,7 @@ function updateUi(state: AppState, refs: UiRefs): void {
   renderChordRows(state, refs.chordsTable);
   renderErrors(state.errors, refs);
   renderSummary(state, refs.summary);
+  renderSignalArea(state, refs);
   renderSavedProgressions(state, refs);
   renderMidi(state, refs);
   renderManualEdits(state, refs);
@@ -1074,6 +1125,25 @@ function renderSummary(state: AppState, container: HTMLDivElement): void {
     <p><strong>Clave seleccionada:</strong> ${state.clave}</p>
     ${referencesHtml}
   `;
+}
+
+function renderSignalArea(state: AppState, refs: UiRefs): void {
+  signalViewer?.setBusy(state.isGenerating);
+  signalViewer?.render(state.generated);
+
+  const hasMidi = Boolean(state.generated);
+  refs.signalDownloadBtn.disabled = !hasMidi || state.isGenerating;
+  refs.signalOpenLink.classList.toggle('signal-embed__cta--disabled', !hasMidi);
+  if (hasMidi) {
+    refs.signalOpenLink.removeAttribute('aria-disabled');
+    refs.signalOpenLink.title = 'Abrir Signal y pegar el MIDI generado';
+  } else {
+    refs.signalOpenLink.setAttribute('aria-disabled', 'true');
+    refs.signalOpenLink.title = 'Genera un montuno para habilitar Signal';
+  }
+
+  refs.signalFrame.classList.toggle('signal-embed__frame--muted', !hasMidi);
+  refs.signalFrame.setAttribute('aria-busy', state.isGenerating ? 'true' : 'false');
 }
 
 const savedDateFormatter = new Intl.DateTimeFormat('es', {
