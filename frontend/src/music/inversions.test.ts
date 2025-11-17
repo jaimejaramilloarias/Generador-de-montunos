@@ -120,8 +120,6 @@ describe('stepInversionPitch', () => {
     }
 
     expect(steps.map((s) => s.pitch)).toEqual([57, 60, 64, 69, 72]);
-
-main
   });
 
   it('no baja de registro al subir aunque la inversión inicial no esté en la rotación', () => {
@@ -130,10 +128,6 @@ main
     const next = stepInversionPitch('G7', startPitch, 1, 'seventh');
 
     expect(next.pitch).toBeGreaterThan(startPitch);
-
-
-main
-
   });
 });
 
