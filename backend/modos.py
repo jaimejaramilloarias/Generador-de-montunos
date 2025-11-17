@@ -66,6 +66,7 @@ def _montuno_generico(
     asignaciones_custom: Optional[List[Tuple[str, List[int], str]]] = None,
     octavacion_default: Optional[str] = None,
     octavaciones_custom: Optional[List[str]] = None,
+    bajos_objetivo: Optional[List[int]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     if asignaciones_custom is None:
         asignaciones, compases = procesar_progresion_en_grupos(
@@ -86,6 +87,12 @@ def _montuno_generico(
                 asignaciones[idx] = (nombre, idxs, arm)
     acordes = [data[0] for data in asignaciones]
     voicings = generar_voicings(acordes)
+    if bajos_objetivo is not None:
+        for idx, (voicing, objetivo) in enumerate(zip(voicings, bajos_objetivo)):
+            if objetivo is None:
+                continue
+            desplazamiento = objetivo - voicing[0]
+            voicings[idx] = [n + desplazamiento for n in voicing]
     return exportar_montuno(
         midi_ref,
         voicings,
@@ -117,6 +124,7 @@ def montuno_tradicional(
     asignaciones_custom: Optional[List[Tuple[str, List[int], str]]] = None,
     octavacion_default: Optional[str] = None,
     octavaciones_custom: Optional[List[str]] = None,
+    bajos_objetivo: Optional[List[int]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Generate a montuno in the traditional style."""
 
@@ -135,6 +143,7 @@ def montuno_tradicional(
         asignaciones_custom=asignaciones_custom,
         octavacion_default=octavacion_default,
         octavaciones_custom=octavaciones_custom,
+        bajos_objetivo=bajos_objetivo,
     )
 
 
@@ -151,6 +160,7 @@ def montuno_extendido(
     asignaciones_custom: Optional[List[Tuple[str, List[int], str]]] = None,
     octavacion_default: Optional[str] = None,
     octavaciones_custom: Optional[List[str]] = None,
+    bajos_objetivo: Optional[List[int]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Generate a montuno emphasising extended chord tones."""
 
@@ -169,6 +179,7 @@ def montuno_extendido(
         asignaciones_custom=asignaciones_custom,
         octavacion_default=octavacion_default,
         octavaciones_custom=octavaciones_custom,
+        bajos_objetivo=bajos_objetivo,
     )
 
 
