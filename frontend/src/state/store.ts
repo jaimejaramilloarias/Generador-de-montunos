@@ -202,8 +202,15 @@ function updateState(partial: Partial<AppState>): void {
 }
 
 function markDirty(): void {
+  const updates: Partial<AppState> = {};
   if (state.generated) {
-    updateState({ generated: undefined });
+    updates.generated = undefined;
+  }
+  if (state.isPlaying) {
+    updates.isPlaying = false;
+  }
+  if (Object.keys(updates).length > 0) {
+    updateState(updates);
   }
 }
 
