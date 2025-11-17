@@ -128,33 +128,32 @@ function inversionPitchClasses(chordName: string): { inversion: Inversion; pc: n
 export function stepInversionPitch(
   chordName: string,
   currentPitch: number,
-  direction: 1 | -1
+  direction: 1 | -1,
+  currentInversion: Inversion
 ): ResolvedChordInversion {
-  const pitchClasses = inversionPitchClasses(chordName);
-  const candidates = pitchClasses.map((entry) => {
-    const baseOctave = Math.floor(currentPitch / SEMITONES_IN_OCTAVE);
-    let pitch = entry.pc + 12 * baseOctave;
-    if (direction === 1 && pitch <= currentPitch + 1e-6) {
-      pitch += SEMITONES_IN_OCTAVE;
-    }
-    if (direction === -1 && pitch >= currentPitch - 1e-6) {
-      pitch -= SEMITONES_IN_OCTAVE;
-    }
-    return { inversion: entry.inversion, pitch } satisfies ResolvedChordInversion;
-  });
+  const rotationOrder: Inversion[] = ['root', 'third', 'fifth'];
+  const pitchClasses = inversionPitchClasses(chordName).filter((entry) => rotationOrder.includes(entry.inversion));
+  const currentIdx = pitchClasses.findIndex((entry) => entry.inversion === currentInversion);
+  const safeCurrent = currentIdx === -1 ? pitchClasses[0] : pitchClasses[currentIdx];
 
-  const selected =
-    direction === 1
-      ? candidates.reduce<ResolvedChordInversion | null>(
-          (best, candidate) => (best === null || candidate.pitch < best.pitch ? candidate : best),
-          null
-        )
-      : candidates.reduce<ResolvedChordInversion | null>(
-          (best, candidate) => (best === null || candidate.pitch > best.pitch ? candidate : best),
-          null
-        );
+  const targetIdx =
+    currentIdx === -1
+      ? (direction === 1 ? 1 : pitchClasses.length - 1) % pitchClasses.length
+      : (currentIdx + direction + pitchClasses.length) % pitchClasses.length;
+  const target = pitchClasses[targetIdx];
 
-  return selected ?? candidates[0];
+  const registerOffset = deriveRegisterOffset(chordName, safeCurrent.inversion, currentPitch);
+  const basePitch = inversionBasePitch(chordName, target.inversion);
+  let pitch = basePitch + registerOffset * SEMITONES_IN_OCTAVE;
+
+  if (direction === 1 && pitch <= currentPitch + 1e-6) {
+    pitch += SEMITONES_IN_OCTAVE;
+  }
+  if (direction === -1 && pitch >= currentPitch - 1e-6) {
+    pitch -= SEMITONES_IN_OCTAVE;
+  }
+
+  return { inversion: target.inversion, pitch } satisfies ResolvedChordInversion;
 }
 
 export function resolveInversionChain(
