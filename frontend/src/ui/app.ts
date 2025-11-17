@@ -401,6 +401,45 @@ function buildLayout(): string {
         <h1>Generador de Montunos</h1>
         <p>Desarrollado por Jaime Jaramillo Arias.</p>
       </header>
+      <section class="app__signal" aria-label="Editor MIDI Signal">
+        <section class="signal-embed">
+          <div class="signal-embed__header">
+            <div>
+              <h3>Editor MIDI Signal integrado</h3>
+              <p>Visualiza al instante el montuno generado y mándalo a Signal con un solo clic.</p>
+            </div>
+            <div class="signal-embed__cta-group">
+              <button type="button" id="signal-download" class="btn btn--ghost">Exportar para Signal</button>
+              <a
+                id="signal-open"
+                class="btn signal-embed__cta"
+                href="https://signalmidi.app/edit"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Abrir Signal
+              </a>
+            </div>
+          </div>
+          <div class="signal-embed__grid">
+            <div class="signal-embed__preview">
+              <div id="signal-viewer" class="signal-viewer"></div>
+              <p class="signal-embed__hint">
+                Se actualiza automáticamente al regenerar, cambiar modo, inversión u octava.
+              </p>
+            </div>
+            <div class="signal-embed__frame">
+              <iframe
+                id="signal-iframe"
+                title="Editor MIDI Signal"
+                src="https://signalmidi.app/edit"
+                loading="lazy"
+                allow="clipboard-read; clipboard-write"
+              ></iframe>
+            </div>
+          </div>
+        </section>
+      </section>
       <section class="app__body">
         <form class="panel" id="montuno-form">
           <fieldset class="panel__section">
@@ -560,43 +599,6 @@ function buildLayout(): string {
           <div id="summary-content" class="summary__content">
             <p>Genera un montuno para ver los detalles de duración, compases y variaciones.</p>
           </div>
-          <section class="signal-embed" aria-label="Editor MIDI Signal">
-            <div class="signal-embed__header">
-              <div>
-                <h3>Editor MIDI Signal integrado</h3>
-                <p>Visualiza al instante el montuno generado y mándalo a Signal con un solo clic.</p>
-              </div>
-              <div class="signal-embed__cta-group">
-                <button type="button" id="signal-download" class="btn btn--ghost">Exportar para Signal</button>
-                <a
-                  id="signal-open"
-                  class="btn signal-embed__cta"
-                  href="https://signalmidi.app/edit"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Abrir Signal
-                </a>
-              </div>
-            </div>
-            <div class="signal-embed__grid">
-              <div class="signal-embed__preview">
-                <div id="signal-viewer" class="signal-viewer"></div>
-                <p class="signal-embed__hint">
-                  Se actualiza automáticamente al regenerar, cambiar modo, inversión u octava.
-                </p>
-              </div>
-              <div class="signal-embed__frame">
-                <iframe
-                  id="signal-iframe"
-                  title="Editor MIDI Signal"
-                  src="https://signalmidi.app/edit"
-                  loading="lazy"
-                  allow="clipboard-read; clipboard-write"
-                ></iframe>
-              </div>
-            </div>
-          </section>
         </aside>
       </section>
     </main>

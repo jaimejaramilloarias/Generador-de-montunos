@@ -11,12 +11,21 @@ interface RenderResult {
   setBusy: (busy: boolean) => void;
 }
 
+function computeMidiHash(data: Uint8Array): number {
+  let hash = 0;
+  for (let index = 0; index < data.length; index += 1) {
+    hash = (hash + (data[index] + 31) * (index + 1)) % 1000000007;
+  }
+  return hash;
+}
+
 function buildSignature(result?: GenerationResult): string | null {
   if (!result) {
     return null;
   }
   const { midiData, maxEighths, bpm } = result;
-  return `${midiData.length}-${maxEighths}-${bpm}`;
+  const hash = computeMidiHash(midiData);
+  return `${midiData.length}-${maxEighths}-${bpm}-${hash}`;
 }
 
 function getNoteBounds(events: NoteEvent[]): { min: number; max: number } {
