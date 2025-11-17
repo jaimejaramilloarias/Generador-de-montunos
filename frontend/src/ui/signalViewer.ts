@@ -107,15 +107,21 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
   function render(result?: GenerationResult, chords?: ChordConfig[]): void {
     const key = buildSignature(result);
     lastChords = chords ?? [];
+    const hasPreview = Boolean(result) || surface.childElementCount > 0;
+    empty.hidden = hasPreview;
+
     if (!result) {
-      state.lastKey = null;
-      lastResult = undefined;
-      surface.replaceChildren();
-      surface.setAttribute('width', '100%');
-      surface.setAttribute('height', '120');
-      empty.hidden = false;
-      meta.textContent = 'Genera un montuno para visualizarlo al instante en el editor embebido.';
-      chordsPanel.innerHTML = '';
+      if (!hasPreview) {
+        state.lastKey = null;
+        lastResult = undefined;
+        surface.replaceChildren();
+        surface.setAttribute('width', '100%');
+        surface.setAttribute('height', '120');
+        meta.textContent = 'Genera un montuno para visualizarlo al instante en el editor embebido.';
+        chordsPanel.innerHTML = '';
+      } else {
+        renderChordControls();
+      }
       return;
     }
 

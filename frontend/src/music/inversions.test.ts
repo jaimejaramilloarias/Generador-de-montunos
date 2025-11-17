@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChordConfig } from '../types';
-import { formatMidiNote, listBassOptions, resolveInversionChain } from './inversions';
+import { formatMidiNote, listBassOptions, resolveInversionChain, stepInversionPitch } from './inversions';
 
 function buildChord(index: number, name: string, inversion: ChordConfig['inversion'] = null): ChordConfig {
   return {
@@ -53,6 +53,34 @@ describe('resolveInversionChain', () => {
     expect(resolved[0].pitch).toBeGreaterThan(0);
     expect(resolved[1].pitch).toBe(resolved[0].pitch);
     expect(Math.abs(resolved[2].pitch - resolved[1].pitch)).toBeLessThanOrEqual(8);
+  });
+});
+
+describe('stepInversionPitch', () => {
+  it('repite las notas del acorde hacia el registro agudo al subir', () => {
+    const startPitch = 48; // C3
+
+    const up1 = stepInversionPitch('Cmaj7', startPitch, 1);
+    const up2 = stepInversionPitch('Cmaj7', up1.pitch, 1);
+    const up3 = stepInversionPitch('Cmaj7', up2.pitch, 1);
+    const up4 = stepInversionPitch('Cmaj7', up3.pitch, 1);
+
+    expect(up1.pitch).toBeGreaterThan(startPitch);
+    expect(up2.pitch).toBeGreaterThan(up1.pitch);
+    expect(up3.pitch).toBeGreaterThan(up2.pitch);
+    expect(up4.pitch).toBeGreaterThan(up3.pitch);
+    expect(up4.inversion).toBe('root');
+  });
+
+  it('recorre las notas hacia el grave al bajar', () => {
+    const startPitch = 72; // C5
+
+    const down1 = stepInversionPitch('Cmaj7', startPitch, -1);
+    const down2 = stepInversionPitch('Cmaj7', down1.pitch, -1);
+
+    expect(down1.pitch).toBeLessThan(startPitch);
+    expect(down2.pitch).toBeLessThan(down1.pitch);
+    expect(down1.inversion).toBe('seventh');
   });
 });
 

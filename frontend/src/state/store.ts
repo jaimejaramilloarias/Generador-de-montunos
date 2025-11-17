@@ -22,7 +22,7 @@ import {
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
 import { isExtendedChordName } from '../utils/chords';
-import { listBassOptions, resolveInversionChain } from '../music/inversions';
+import { resolveInversionChain, stepInversionPitch } from '../music/inversions';
 
 const listeners = new Set<(state: AppState) => void>();
 
@@ -329,51 +329,61 @@ export function nudgeChordBass(index: number, direction: 1 | -1): void {
   if (!chord || !current) {
     return;
   }
-  const prevPitch = index > 0 ? resolved[index - 1]?.pitch ?? null : null;
-  const options = listBassOptions(chord.name, prevPitch);
-  if (!options.length) {
-    return;
+  let pitch = current.pitch;
+  let inversion = current.inversion;
+  const steps = Math.max(1, Math.abs(direction));
+  const sign: 1 | -1 = direction >= 0 ? 1 : -1;
+
+  for (let step = 0; step < steps; step += 1) {
+    const target = stepInversionPitch(chord.name, pitch, sign);
+    pitch = target.pitch;
+    inversion = target.inversion;
   }
 
-  const unique: typeof options = [];
-  options.forEach((option) => {
-    if (!unique.some((entry) => entry.inversion === option.inversion && Math.abs(entry.pitch - option.pitch) < 1e-6)) {
-      unique.push(option);
-    }
-  });
-
-  const currentIndex = unique.findIndex(
-    (option) => option.inversion === current.inversion && Math.abs(option.pitch - current.pitch) < 1e-6
-  );
-  const fallbackIndex = currentIndex === -1 ? unique.findIndex((option) => option.inversion === current.inversion) : currentIndex;
-  const baseIndex = fallbackIndex === -1 ? 0 : fallbackIndex;
-  const targetIndex = Math.min(Math.max(baseIndex + direction, 0), unique.length - 1);
-
-  const target = unique[targetIndex];
-  if (target && target.inversion !== chord.inversion) {
-    setChord(index, { inversion: target.inversion });
+  if (inversion !== current.inversion) {
+    setChord(index, { inversion });
   }
 }
 
 export function shiftAllInversions(delta: number): void {
-  const chords = state.chords.map((chord) => {
-    const current = chord.inversion ?? state.inversionDefault;
-    const index = INVERSION_ORDER.indexOf(current);
-    if (index === -1) {
+  if (!delta) {
+    return;
+  }
+
+  const resolved = resolveInversionChain(state.chords, state.inversionDefault);
+  const steps = Math.max(1, Math.abs(delta));
+  const direction: 1 | -1 = delta > 0 ? 1 : -1;
+
+  const chords = state.chords.map((chord, idx) => {
+    const current = resolved[idx];
+    if (!current) {
       return chord;
     }
-    const next = INVERSION_ORDER[(index + delta + INVERSION_ORDER.length) % INVERSION_ORDER.length];
-    return { ...chord, inversion: next } satisfies ChordConfig;
+
+    let pitch = current.pitch;
+    let inversion = current.inversion;
+    for (let step = 0; step < steps; step += 1) {
+      const target = stepInversionPitch(chord.name, pitch, direction);
+      pitch = target.pitch;
+      inversion = target.inversion;
+    }
+
+    if (inversion === chord.inversion) {
+      return chord;
+    }
+
+    return { ...chord, inversion } satisfies ChordConfig;
   });
   updateState({ chords });
   markDirty();
 }
 
 export function recalculateInversions(): void {
-  const resolved = resolveInversionChain(state.chords, state.inversionDefault);
+  const baseChords = state.chords.map((chord) => ({ ...chord, inversion: null as Inversion | null }));
+  const resolved = resolveInversionChain(baseChords, state.inversionDefault);
   const chords = state.chords.map((chord, index) => ({
     ...chord,
-    inversion: resolved[index]?.inversion ?? chord.inversion ?? null,
+    inversion: resolved[index]?.inversion ?? state.inversionDefault ?? null,
   }));
   updateState({ chords });
   markDirty();
