@@ -11,10 +11,7 @@ from .voicings_tradicional import (
     generar_voicings_enlazados_extendido,
     generar_voicings_enlazados_tradicional,
 )
-from .midi_utils_tradicional import (
-    exportar_montuno,
-    procesar_progresion_en_grupos,
-)
+from . import midi_utils, midi_utils_tradicional
 from .salsa import montuno_salsa
 
 
@@ -22,8 +19,39 @@ from .salsa import montuno_salsa
 # Shared helpers
 # ==========================================================================
 
+def _exportar_montuno_extendido(
+    midi_ref: Path,
+    voicings: List[List[int]],
+    asignaciones: List[Tuple[str, List[int], str]],
+    compases: int,
+    output: Path,
+    armonizacion: Optional[str] = None,
+    *,
+    inicio_cor: int = 0,
+    return_pm: bool = False,
+    aleatorio: bool = False,
+    debug: bool = False,
+) -> Optional[pretty_midi.PrettyMIDI]:
+    """Wrap :func:`midi_utils.exportar_montuno` adding ``return_pm`` support."""
+
+    midi_utils.exportar_montuno(
+        midi_ref,
+        voicings,
+        asignaciones,
+        compases,
+        output,
+        armonizacion,
+        inicio_cor=inicio_cor,
+        aleatorio=aleatorio,
+        debug=debug,
+    )
+    return pretty_midi.PrettyMIDI(str(output)) if return_pm else None
+
+
 def _montuno_generico(
     generar_voicings,
+    procesar_progresion_en_grupos,
+    exportar_montuno,
     progresion_texto: str,
     midi_ref: Path,
     output: Path,
@@ -86,6 +114,8 @@ def montuno_tradicional(
 
     return _montuno_generico(
         generar_voicings_enlazados_tradicional,
+        midi_utils_tradicional.procesar_progresion_en_grupos,
+        midi_utils_tradicional.exportar_montuno,
         progresion_texto,
         midi_ref,
         output,
@@ -114,6 +144,8 @@ def montuno_extendido(
 
     return _montuno_generico(
         generar_voicings_enlazados_extendido,
+        midi_utils.procesar_progresion_en_grupos,
+        _exportar_montuno_extendido,
         progresion_texto,
         midi_ref,
         output,
