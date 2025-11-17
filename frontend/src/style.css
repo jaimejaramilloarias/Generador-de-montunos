@@ -525,6 +525,10 @@ input[type='number'] {
   gap: 0.5rem;
 }
 
+.signal-embed__preview--full {
+  grid-column: 1 / -1;
+}
+
 .signal-embed__hint {
   margin: 0;
   color: rgba(226, 232, 240, 0.85);
@@ -653,6 +657,82 @@ input[type='number'] {
   font-weight: 600;
   text-align: center;
   padding: 1rem;
+}
+
+.signal-viewer__chords {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.signal-viewer__chords-empty {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.8);
+}
+
+.signal-viewer__chord-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.signal-viewer__chord {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  background: rgba(15, 23, 42, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.signal-viewer__chord-name {
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.signal-viewer__chord-meta {
+  color: rgba(226, 232, 240, 0.8);
+  font-size: 0.92rem;
+}
+
+.signal-viewer__chord-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.signal-viewer__control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.signal-viewer__tag {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(226, 232, 240, 0.9);
+  padding: 0.15rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.signal-viewer__mini-btn {
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  color: #bfdbfe;
+  padding: 0.25rem 0.55rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.signal-viewer__mini-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.75);
 }
 
 @media (max-width: 960px) {
