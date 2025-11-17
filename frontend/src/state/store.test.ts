@@ -86,6 +86,17 @@ describe('state/store saved progressions', () => {
     expect(state.modoDefault).toBe('Extendido');
   });
 
+  it('mantiene el modo extendido en acordes con tensiones al cambiar el modo global', () => {
+    setProgression('Cmaj9 | Dm7(9) G7');
+    setDefaultModo('Tradicional');
+
+    const state = getState();
+    expect(state.chords[0]?.modo).toBe('Extendido');
+    expect(state.chords[1]?.modo).toBe('Extendido');
+    expect(state.chords[2]?.modo).toBe('Tradicional');
+    expect(state.modoDefault).toBe('Tradicional');
+  });
+
   it('permite ajustar el modo de cualquier acorde, aunque el cifrado sea extendido', () => {
     setProgression('Cmaj9 | Dm9 G9');
     setChord(0, { modo: 'Tradicional' });
