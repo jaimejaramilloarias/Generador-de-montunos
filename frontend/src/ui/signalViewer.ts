@@ -1,4 +1,9 @@
-import type { GenerationResult, NoteEvent } from '../types';
+import type { ChordConfig, GenerationResult, NoteEvent } from '../types';
+
+interface ViewerActions {
+  onBassNudge?: (index: number, direction: 1 | -1) => void;
+  onOctaveShift?: (index: number, direction: 1 | -1) => void;
+}
 
 interface ViewerState {
   zoom: number;
@@ -7,7 +12,7 @@ interface ViewerState {
 }
 
 interface RenderResult {
-  render: (result?: GenerationResult) => void;
+  render: (result?: GenerationResult, chords?: ChordConfig[]) => void;
   setBusy: (busy: boolean) => void;
 }
 
@@ -45,7 +50,7 @@ function formatBeat(value: number): string {
   return `${Number.parseFloat(value.toFixed(2))}`;
 }
 
-export function mountSignalViewer(container: HTMLElement): RenderResult {
+export function mountSignalViewer(container: HTMLElement, actions: ViewerActions = {}): RenderResult {
   const header = document.createElement('div');
   header.className = 'signal-viewer__toolbar';
 
@@ -84,7 +89,10 @@ export function mountSignalViewer(container: HTMLElement): RenderResult {
   wrapper.className = 'signal-viewer__canvas';
   wrapper.append(surface, empty);
 
-  container.append(header, meta, wrapper);
+  const chordsPanel = document.createElement('div');
+  chordsPanel.className = 'signal-viewer__chords';
+
+  container.append(header, meta, wrapper, chordsPanel);
 
   const state: ViewerState = {
     zoom: 1,
@@ -92,9 +100,11 @@ export function mountSignalViewer(container: HTMLElement): RenderResult {
     isBusy: false,
   };
   let lastResult: GenerationResult | undefined;
+  let lastChords: ChordConfig[] = [];
 
-  function render(result?: GenerationResult): void {
+  function render(result?: GenerationResult, chords?: ChordConfig[]): void {
     const key = buildSignature(result);
+    lastChords = chords ?? [];
     if (!result) {
       state.lastKey = null;
       lastResult = undefined;
@@ -103,12 +113,14 @@ export function mountSignalViewer(container: HTMLElement): RenderResult {
       surface.setAttribute('height', '120');
       empty.hidden = false;
       meta.textContent = 'Genera un montuno para visualizarlo al instante en el editor embebido.';
+      chordsPanel.innerHTML = '';
       return;
     }
 
     if (state.lastKey === key && surface.childElementCount > 0) {
       meta.textContent = `BPM ${result.bpm} · ${result.lengthBars} compases · ${result.modoTag}`;
       empty.hidden = true;
+      renderChordControls();
       return;
     }
 
@@ -175,6 +187,8 @@ export function mountSignalViewer(container: HTMLElement): RenderResult {
     surface.appendChild(footer);
 
     meta.textContent = `BPM ${result.bpm} · ${result.lengthBars} compases · ${result.modoTag}`;
+
+    renderChordControls();
   }
 
   function setBusy(busy: boolean): void {
@@ -188,14 +202,79 @@ export function mountSignalViewer(container: HTMLElement): RenderResult {
   zoomOut.addEventListener('click', () => {
     state.zoom = Math.max(0.5, state.zoom - 0.2);
     state.lastKey = null;
-    render(lastResult);
+    render(lastResult, lastChords);
   });
 
   zoomIn.addEventListener('click', () => {
     state.zoom = Math.min(2.4, state.zoom + 0.2);
     state.lastKey = null;
-    render(lastResult);
+    render(lastResult, lastChords);
   });
 
   return { render, setBusy };
+
+  function renderChordControls(): void {
+    chordsPanel.innerHTML = '';
+    if (!lastChords.length) {
+      const emptyState = document.createElement('p');
+      emptyState.className = 'signal-viewer__chords-empty';
+      emptyState.textContent = 'Agrega una progresión para ajustar la nota grave y la octavación por acorde.';
+      chordsPanel.appendChild(emptyState);
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'signal-viewer__chord-grid';
+    grid.style.setProperty('--chord-count', String(lastChords.length));
+
+    lastChords.forEach((chord) => {
+      const card = document.createElement('div');
+      card.className = 'signal-viewer__chord';
+
+      const name = document.createElement('div');
+      name.className = 'signal-viewer__chord-name';
+      name.textContent = chord.name;
+
+      const metaRow = document.createElement('div');
+      metaRow.className = 'signal-viewer__chord-meta';
+      metaRow.textContent = chord.octavacion;
+
+      const actionsRow = document.createElement('div');
+      actionsRow.className = 'signal-viewer__chord-actions';
+
+      const bassGroup = document.createElement('div');
+      bassGroup.className = 'signal-viewer__control-group';
+      const bassLabel = document.createElement('span');
+      bassLabel.className = 'signal-viewer__tag';
+      bassLabel.textContent = 'Nota grave';
+      const bassUp = createActionButton('↑', 'Subir nota grave', () => actions.onBassNudge?.(chord.index, 1));
+      const bassDown = createActionButton('↓', 'Bajar nota grave', () => actions.onBassNudge?.(chord.index, -1));
+      bassGroup.append(bassLabel, bassDown, bassUp);
+
+      const octaveGroup = document.createElement('div');
+      octaveGroup.className = 'signal-viewer__control-group';
+      const octaveLabel = document.createElement('span');
+      octaveLabel.className = 'signal-viewer__tag';
+      octaveLabel.textContent = 'Octavación';
+      const octaveDown = createActionButton('−', 'Octava abajo', () => actions.onOctaveShift?.(chord.index, -1));
+      const octaveUp = createActionButton('+', 'Octava arriba', () => actions.onOctaveShift?.(chord.index, 1));
+      octaveGroup.append(octaveLabel, octaveDown, octaveUp);
+
+      actionsRow.append(bassGroup, octaveGroup);
+      card.append(name, metaRow, actionsRow);
+      grid.appendChild(card);
+    });
+
+    chordsPanel.appendChild(grid);
+  }
+
+  function createActionButton(label: string, title: string, onClick: () => void): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'signal-viewer__mini-btn';
+    button.textContent = label;
+    button.title = title;
+    button.addEventListener('click', onClick);
+    return button;
+  }
 }
