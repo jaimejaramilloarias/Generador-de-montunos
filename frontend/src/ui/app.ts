@@ -553,6 +553,30 @@ function buildLayout(): string {
           <div id="summary-content" class="summary__content">
             <p>Genera un montuno para ver los detalles de duración, compases y variaciones.</p>
           </div>
+          <section class="signal-embed" aria-label="Editor MIDI Signal">
+            <div class="signal-embed__header">
+              <div>
+                <h3>Editar en Signal</h3>
+                <p>Descarga el MIDI generado y arrástralo al editor para visualizarlo o editarlo.</p>
+              </div>
+              <a
+                class="btn signal-embed__cta"
+                href="https://signalmidi.app/edit"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Abrir en pestaña nueva
+              </a>
+            </div>
+            <div class="signal-embed__frame">
+              <iframe
+                title="Editor MIDI Signal"
+                src="https://signalmidi.app/edit"
+                loading="lazy"
+                allow="clipboard-read; clipboard-write"
+              ></iframe>
+            </div>
+          </section>
         </aside>
       </section>
     </main>
