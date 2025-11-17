@@ -2,14 +2,17 @@ import {
   getState,
   deleteSavedProgression,
   loadSavedProgression,
+  removeManualEdit,
   resetPlayback,
   saveCurrentProgression,
+  addManualEdit,
   setBpm,
   setChord,
   setClave,
   setDefaultArmonizacion,
   setDefaultInversion,
   setDefaultModo,
+  shiftAllInversions,
   setMidiOutputs,
   setMidiStatus,
   setSelectedMidiOutput,
@@ -21,6 +24,7 @@ import {
   setSeed,
   setVariation,
   subscribe,
+  updateManualEdit,
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, INVERSIONES, MODOS, VARIACIONES } from '../types/constants';
 import type { AppState, ChordConfig, GenerationResult, MidiStatus } from '../types';
@@ -47,6 +51,9 @@ interface UiRefs {
   variationSelect: HTMLSelectElement;
   bpmInput: HTMLInputElement;
   seedInput: HTMLInputElement;
+  variationRandomBtn: HTMLButtonElement;
+  inversionShiftUpBtn: HTMLButtonElement;
+  inversionShiftDownBtn: HTMLButtonElement;
   generateBtn: HTMLButtonElement;
   playBtn: HTMLButtonElement;
   downloadBtn: HTMLButtonElement;
@@ -60,6 +67,8 @@ interface UiRefs {
   midiEnableBtn: HTMLButtonElement;
   midiOutputSelect: HTMLSelectElement;
   midiStatusText: HTMLParagraphElement;
+  manualEditsTable: HTMLTableSectionElement;
+  manualAddButton: HTMLButtonElement;
 }
 
 const MIDI_STATUS_MESSAGES: Record<MidiStatus, string> = {
@@ -326,6 +335,43 @@ function buildLayout(): string {
           </section>
           <section class="panel__section">
             <header class="panel__section-header">
+              <h2>Controles avanzados</h2>
+              <p>Recrea los accesos directos de la app original para variaciones e inversiones.</p>
+            </header>
+            <div class="advanced-controls">
+              <button type="button" id="variation-random" class="btn">Generar variación</button>
+              <div class="advanced-controls__group" role="group" aria-label="Desplazar inversiones">
+                <button type="button" id="shift-inv-up" class="btn" title="Subir inversiones">Inversiones ↑</button>
+                <button type="button" id="shift-inv-down" class="btn" title="Bajar inversiones">Inversiones ↓</button>
+              </div>
+            </div>
+          </section>
+          <section class="panel__section">
+            <header class="panel__section-header">
+              <h2>Ediciones manuales</h2>
+              <p>Aplica correcciones puntuales (añadir, mover o borrar notas) antes de exportar.</p>
+            </header>
+            <div class="manual-edits__actions">
+              <button type="button" id="manual-add" class="btn">Añadir edición</button>
+              <p class="panel__hint">Las posiciones se expresan en beats; el BPM actual define la duración real.</p>
+            </div>
+            <div class="table-container table-container--compact">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tipo</th>
+                    <th>Inicio (beats)</th>
+                    <th>Duración (beats)</th>
+                    <th>Nota MIDI</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="manual-edits"></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="panel__section">
+            <header class="panel__section-header">
               <h2>Conexión MIDI</h2>
               <p>Envía el montuno a un dispositivo local mediante Web MIDI.</p>
             </header>
@@ -380,6 +426,9 @@ function grabRefs(root: HTMLElement): UiRefs {
     variationSelect: root.querySelector<HTMLSelectElement>('#variacion')!,
     bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
     seedInput: root.querySelector<HTMLInputElement>('#seed')!,
+    variationRandomBtn: root.querySelector<HTMLButtonElement>('#variation-random')!,
+    inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
+    inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
     generateBtn: root.querySelector<HTMLButtonElement>('#generate')!,
     playBtn: root.querySelector<HTMLButtonElement>('#play')!,
     downloadBtn: root.querySelector<HTMLButtonElement>('#download')!,
@@ -393,6 +442,8 @@ function grabRefs(root: HTMLElement): UiRefs {
     midiEnableBtn: root.querySelector<HTMLButtonElement>('#midi-enable')!,
     midiOutputSelect: root.querySelector<HTMLSelectElement>('#midi-output')!,
     midiStatusText: root.querySelector<HTMLParagraphElement>('#midi-status')!,
+    manualEditsTable: root.querySelector<HTMLTableSectionElement>('#manual-edits')!,
+    manualAddButton: root.querySelector<HTMLButtonElement>('#manual-add')!,
   };
 }
 
@@ -459,6 +510,20 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     } else {
       setSeed(seed);
     }
+  });
+
+  refs.variationRandomBtn.addEventListener('click', async () => {
+    const randomSeed = crypto?.getRandomValues ? crypto.getRandomValues(new Uint32Array(1))[0] : Math.floor(Math.random() * 1e9);
+    setSeed(randomSeed);
+    await handleGenerate(refs);
+  });
+
+  refs.inversionShiftUpBtn.addEventListener('click', () => {
+    shiftAllInversions(1);
+  });
+
+  refs.inversionShiftDownBtn.addEventListener('click', () => {
+    shiftAllInversions(-1);
   });
 
   refs.midiEnableBtn.addEventListener('click', async () => {
@@ -601,6 +666,10 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
       refs.saveButton.click();
     }
   });
+
+  refs.manualAddButton.addEventListener('click', () => {
+    addManualEdit();
+  });
 }
 
 async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefined> {
@@ -683,6 +752,7 @@ function updateUi(state: AppState, refs: UiRefs): void {
   renderSummary(state, refs.summary);
   renderSavedProgressions(state, refs);
   renderMidi(state, refs);
+  renderManualEdits(state, refs);
 
   const progressionEmpty = state.progressionInput.trim().length === 0;
   const hasBlockingErrors = state.errors.length > 0;
@@ -905,6 +975,97 @@ function renderSavedProgressions(state: AppState, refs: UiRefs): void {
     actions.append(loadButton, deleteButton);
     entry.append(info, actions);
     list.appendChild(entry);
+  });
+}
+
+function renderManualEdits(state: AppState, refs: UiRefs): void {
+  const tbody = refs.manualEditsTable;
+  tbody.innerHTML = '';
+
+  if (!state.manualEdits.length) {
+    const empty = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 5;
+    cell.textContent = 'Aún no hay ediciones manuales.';
+    empty.appendChild(cell);
+    tbody.appendChild(empty);
+    return;
+  }
+
+  state.manualEdits.forEach((entry, index) => {
+    const row = document.createElement('tr');
+
+    const typeCell = document.createElement('td');
+    const select = document.createElement('select');
+    ['modify', 'add', 'delete'].forEach((value) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent =
+        value === 'modify' ? 'Modificar' : value === 'add' ? 'Añadir' : 'Eliminar';
+      select.appendChild(option);
+    });
+    select.value = entry.type;
+    select.addEventListener('change', (event) => {
+      updateManualEdit(index, { type: (event.target as HTMLSelectElement).value as AppState['manualEdits'][number]['type'] });
+    });
+    typeCell.appendChild(select);
+
+    const startCell = document.createElement('td');
+    const startInput = document.createElement('input');
+    startInput.type = 'number';
+    startInput.step = '0.25';
+    startInput.min = '0';
+    startInput.value = entry.startBeats.toString();
+    startInput.addEventListener('change', (event) => {
+      const value = Number.parseFloat((event.target as HTMLInputElement).value);
+      if (!Number.isFinite(value) || value < 0) {
+        return;
+      }
+      updateManualEdit(index, { startBeats: value });
+    });
+    startCell.appendChild(startInput);
+
+    const durationCell = document.createElement('td');
+    const durationInput = document.createElement('input');
+    durationInput.type = 'number';
+    durationInput.step = '0.25';
+    durationInput.min = '0.125';
+    durationInput.value = entry.durationBeats.toString();
+    durationInput.addEventListener('change', (event) => {
+      const value = Number.parseFloat((event.target as HTMLInputElement).value);
+      if (!Number.isFinite(value) || value <= 0) {
+        return;
+      }
+      updateManualEdit(index, { durationBeats: value });
+    });
+    durationCell.appendChild(durationInput);
+
+    const pitchCell = document.createElement('td');
+    const pitchInput = document.createElement('input');
+    pitchInput.type = 'number';
+    pitchInput.step = '1';
+    pitchInput.min = '1';
+    pitchInput.max = '127';
+    pitchInput.value = entry.pitch.toString();
+    pitchInput.addEventListener('change', (event) => {
+      const value = Number.parseInt((event.target as HTMLInputElement).value, 10);
+      if (!Number.isFinite(value) || value <= 0 || value > 127) {
+        return;
+      }
+      updateManualEdit(index, { pitch: value });
+    });
+    pitchCell.appendChild(pitchInput);
+
+    const actionsCell = document.createElement('td');
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn btn--ghost';
+    deleteBtn.textContent = '✕';
+    deleteBtn.addEventListener('click', () => removeManualEdit(index));
+    actionsCell.appendChild(deleteBtn);
+
+    row.append(typeCell, startCell, durationCell, pitchCell, actionsCell);
+    tbody.appendChild(row);
   });
 }
 

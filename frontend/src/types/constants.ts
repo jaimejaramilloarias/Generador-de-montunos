@@ -20,5 +20,6 @@ export const INVERSIONES: Record<Inversion, string> = {
   fifth: 'Quinta',
   seventh: 'Séptima',
 };
+export const INVERSION_ORDER: Inversion[] = ['root', 'third', 'fifth', 'seventh'];
 
 export const STORAGE_KEY = 'montuno-web/preferences/v1';

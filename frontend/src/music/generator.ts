@@ -18,6 +18,13 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
     armonizacion: chord.armonizacion,
     inversion: chord.inversion ?? null,
   }));
+  const secondsPerBeat = 60 / state.bpm;
+  const manualEdits = (state.manualEdits ?? []).map((edit) => ({
+    type: edit.type,
+    start: edit.startBeats * secondsPerBeat,
+    end: (edit.startBeats + edit.durationBeats) * secondsPerBeat,
+    pitch: edit.pitch,
+  }));
 
   let raw: RawGenerationResult;
   try {
@@ -33,6 +40,7 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
         seed,
         chords,
         referenceRoot: REFERENCE_ROOT,
+        manualEdits,
       },
       baseUrl
     );

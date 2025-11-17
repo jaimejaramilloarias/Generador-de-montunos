@@ -1,4 +1,4 @@
-import type { AppState, PersistedState, SavedProgression } from '../types';
+import type { AppState, ManualEditEntry, PersistedState, SavedProgression } from '../types';
 import { STORAGE_KEY } from '../types/constants';
 
 function isSavedProgression(value: unknown): value is SavedProgression {
@@ -11,6 +11,22 @@ function isSavedProgression(value: unknown): value is SavedProgression {
     typeof candidate.name === 'string' &&
     typeof candidate.progression === 'string' &&
     typeof candidate.updatedAt === 'string'
+  );
+}
+
+function isManualEdit(value: unknown): value is ManualEditEntry {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  return (
+    (candidate.type === 'modify' || candidate.type === 'add' || candidate.type === 'delete') &&
+    typeof candidate.startBeats === 'number' &&
+    Number.isFinite(candidate.startBeats) &&
+    typeof candidate.durationBeats === 'number' &&
+    Number.isFinite(candidate.durationBeats) &&
+    typeof candidate.pitch === 'number' &&
+    Number.isFinite(candidate.pitch)
   );
 }
 
@@ -31,6 +47,9 @@ export function loadPreferences(): PersistedState | null {
       parsed.savedProgressions = parsed.savedProgressions.filter(isSavedProgression);
     } else {
       delete parsed.savedProgressions;
+    }
+    if (Array.isArray((parsed as Record<string, unknown>).manualEdits)) {
+      parsed.manualEdits = (parsed as Record<string, unknown>).manualEdits?.filter(isManualEdit);
     }
     if (parsed.activeProgressionId !== undefined && typeof parsed.activeProgressionId !== 'string') {
       parsed.activeProgressionId = null;
@@ -61,6 +80,7 @@ export function savePreferences(state: AppState): void {
     variation: state.variation,
     inversionDefault: state.inversionDefault,
     bpm: state.bpm,
+    manualEdits: state.manualEdits,
     savedProgressions: state.savedProgressions,
     activeProgressionId: state.activeProgressionId,
     selectedMidiOutputId: state.selectedMidiOutputId,

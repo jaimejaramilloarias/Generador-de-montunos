@@ -28,7 +28,9 @@ Este repositorio contiene las dos variantes del generador de montunos:
    El servidor queda disponible en `http://localhost:5173`.
 3. Define la progresión de acordes, selecciona clave, variación y tempo.
 4. Personaliza modo, armonización e inversión por acorde desde la tabla dinámica.
-5. Genera el montuno para escucharlo en el navegador (Tone.js) o descargarlo como `.mid`.
+5. Opcional: usa los controles avanzados para rotar todas las inversiones o fijar una nueva semilla de variación.
+6. Añade ediciones manuales (modificar/añadir/eliminar notas) antes de exportar o reproducir.
+7. Genera el montuno para escucharlo en el navegador (Tone.js) o descargarlo como `.mid`.
 
 Las preferencias (última progresión, clave, tempo, etc.) se guardan automáticamente en `localStorage`, por lo que al recargar se restaura el estado anterior.
 
