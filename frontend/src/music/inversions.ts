@@ -2,23 +2,7 @@ import type { ChordConfig, Inversion, ResolvedChordInversion } from '../types';
 import { INVERSION_ORDER } from '../types/constants';
 import { detectIntervals, getChordRootSemitone } from './chords';
 
-const BASS_RANGE_MIN = 48; // C3
-const BASS_RANGE_MAX = 67; // G4
-const BASS_RANGE_EXTRA = 4;
 const MAX_LEAP = 8; // minor sixth
-
-function confineToRange(pitch: number, extended: boolean): number {
-  const min = extended ? BASS_RANGE_MIN - BASS_RANGE_EXTRA : BASS_RANGE_MIN;
-  const max = extended ? BASS_RANGE_MAX + BASS_RANGE_EXTRA : BASS_RANGE_MAX;
-  let result = pitch;
-  while (result < min) {
-    result += 12;
-  }
-  while (result > max) {
-    result -= 12;
-  }
-  return result;
-}
 
 function limitLeap(prev: number | null, pitch: number): number {
   if (prev === null) {
@@ -32,15 +16,6 @@ function limitLeap(prev: number | null, pitch: number): number {
     result += 12;
   }
   return result;
-}
-
-function adjustFlexibleRange(prev: number | null, pitch: number): number {
-  const base = limitLeap(prev, confineToRange(pitch, false));
-  if (prev === null || Math.abs(base - prev) <= MAX_LEAP) {
-    return base;
-  }
-
-  return limitLeap(prev, confineToRange(pitch, true));
 }
 
 function inversionBasePitch(chordName: string, inversion: Inversion): number {
@@ -69,7 +44,7 @@ export function calculateBassPitch(
   prevPitch: number | null
 ): number {
   const basePitch = inversionBasePitch(chordName, inversion);
-  return adjustFlexibleRange(prevPitch, basePitch);
+  return limitLeap(prevPitch, basePitch);
 }
 
 function nearestPitchForPc(prevPitch: number, pitchClass: number): number {
@@ -144,7 +119,7 @@ export function resolveInversionChain(
       );
 
       chosenInversion = matchingInversion ?? inversionDefault;
-      pitch = adjustFlexibleRange(prevPitch, closestTone.pitch);
+      pitch = limitLeap(prevPitch, closestTone.pitch);
     }
 
     prevPitch = pitch;
