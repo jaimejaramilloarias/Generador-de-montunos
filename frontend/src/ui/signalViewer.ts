@@ -1,13 +1,10 @@
-import { ARMONIZACIONES, INVERSIONES, MODOS, OCTAVACIONES } from '../types/constants';
-import type { Armonizacion, ChordConfig, GenerationResult, Inversion, Modo, NoteEvent, Octavacion } from '../types';
+import { ARMONIZACIONES, MODOS } from '../types/constants';
+import type { Armonizacion, ChordConfig, GenerationResult, Modo, NoteEvent } from '../types';
 
 interface ViewerActions {
   onBassNudge?: (index: number, direction: 1 | -1) => void;
-  onOctaveShift?: (index: number, direction: 1 | -1) => void;
   onModeChange?: (index: number, mode: Modo) => void;
   onArmonizacionChange?: (index: number, armonizacion: Armonizacion) => void;
-  onOctavacionChange?: (index: number, octavacion: Octavacion) => void;
-  onInversionChange?: (index: number, inversion: Inversion | null) => void;
 }
 
 interface ViewerState {
@@ -223,7 +220,7 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
     if (!lastChords.length) {
       const emptyState = document.createElement('p');
       emptyState.className = 'signal-viewer__chords-empty';
-      emptyState.textContent = 'Agrega una progresión para ajustar la nota grave y la octavación por acorde.';
+      emptyState.textContent = 'Agrega una progresión para ajustar la nota grave y el modo de cada acorde.';
       chordsPanel.appendChild(emptyState);
       return;
     }
@@ -242,7 +239,8 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
 
       const metaRow = document.createElement('div');
       metaRow.className = 'signal-viewer__chord-meta';
-      metaRow.textContent = `${chord.octavacion} · ${chord.modo}`;
+      const armonizacionTag = chord.modo === 'Tradicional' ? ` · ${chord.armonizacion}` : '';
+      metaRow.textContent = `${chord.modo}${armonizacionTag}`;
 
       const primaryControls = document.createElement('div');
       primaryControls.className = 'signal-viewer__control-row';
@@ -250,44 +248,19 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
       const modoField = buildSelectField('Modo', MODOS, chord.modo, (value) => {
         actions.onModeChange?.(chord.index, value as Modo);
       });
-      const armonizacionField = buildSelectField(
-        'Armonización',
-        ARMONIZACIONES,
-        chord.armonizacion,
-        (value) => {
-          actions.onArmonizacionChange?.(chord.index, value as Armonizacion);
-        }
-      );
-      const armonizacionDisabled = chord.modo !== 'Tradicional';
-      armonizacionField.select.disabled = armonizacionDisabled;
-      armonizacionField.wrapper.classList.toggle('signal-viewer__field--disabled', armonizacionDisabled);
-      armonizacionField.select.title = armonizacionDisabled
-        ? 'La armonización solo está disponible en modo Tradicional'
-        : 'Armonización por acorde';
+      primaryControls.append(modoField.wrapper);
 
-      primaryControls.append(modoField.wrapper, armonizacionField.wrapper);
-
-      const secondaryControls = document.createElement('div');
-      secondaryControls.className = 'signal-viewer__control-row';
-
-      const octavacionField = buildSelectField(
-        'Octavación',
-        OCTAVACIONES,
-        chord.octavacion,
-        (value) => {
-          actions.onOctavacionChange?.(chord.index, value as Octavacion);
-        }
-      );
-      const inversionOptions = [
-        { value: '', label: 'Automática' },
-        ...Object.entries(INVERSIONES).map(([value, label]) => ({ value, label })),
-      ];
-      const inversionField = buildSelectField('Inversión', inversionOptions, chord.inversion ?? '', (value) => {
-        const next = value === '' ? null : (value as Inversion);
-        actions.onInversionChange?.(chord.index, next);
-      });
-
-      secondaryControls.append(octavacionField.wrapper, inversionField.wrapper);
+      if (chord.modo === 'Tradicional') {
+        const armonizacionField = buildSelectField(
+          'Armonización',
+          ARMONIZACIONES,
+          chord.armonizacion,
+          (value) => {
+            actions.onArmonizacionChange?.(chord.index, value as Armonizacion);
+          }
+        );
+        primaryControls.append(armonizacionField.wrapper);
+      }
 
       const actionsRow = document.createElement('div');
       actionsRow.className = 'signal-viewer__chord-actions';
@@ -301,17 +274,8 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
       const bassDown = createActionButton('↓', 'Bajar nota grave', () => actions.onBassNudge?.(chord.index, -1));
       bassGroup.append(bassLabel, bassDown, bassUp);
 
-      const octaveGroup = document.createElement('div');
-      octaveGroup.className = 'signal-viewer__control-group';
-      const octaveLabel = document.createElement('span');
-      octaveLabel.className = 'signal-viewer__tag';
-      octaveLabel.textContent = 'Octavación';
-      const octaveDown = createActionButton('−', 'Octava abajo', () => actions.onOctaveShift?.(chord.index, -1));
-      const octaveUp = createActionButton('+', 'Octava arriba', () => actions.onOctaveShift?.(chord.index, 1));
-      octaveGroup.append(octaveLabel, octaveDown, octaveUp);
-
-      actionsRow.append(bassGroup, octaveGroup);
-      card.append(name, metaRow, primaryControls, secondaryControls, actionsRow);
+      actionsRow.append(bassGroup);
+      card.append(name, metaRow, primaryControls, actionsRow);
       grid.appendChild(card);
     });
 

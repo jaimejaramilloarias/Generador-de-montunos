@@ -504,6 +504,11 @@ input[type='number'] {
   line-height: 1;
 }
 
+.icon-btn--wide {
+  padding: 0.35rem 0.85rem;
+  font-weight: 700;
+}
+
 .icon-btn:hover:not(:disabled) {
   background: rgba(59, 130, 246, 0.14);
   border-color: rgba(59, 130, 246, 0.4);
@@ -800,6 +805,10 @@ input[type='number'] {
 .signal-viewer__mini-btn:hover {
   background: rgba(59, 130, 246, 0.2);
   border-color: rgba(59, 130, 246, 0.75);
+}
+
+.is-hidden {
+  display: none !important;
 }
 
 @media (max-width: 960px) {
