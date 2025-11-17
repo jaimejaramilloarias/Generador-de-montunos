@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # salsa.py
 from pathlib import Path
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Set
 import pretty_midi
 
 import re
@@ -31,6 +31,53 @@ APPROACH_NOTES = {"D", "A", "B", "D#", "F", "G#", "C#"}
 # change occurs at the beginning of the pattern.  Set to ``True`` to keep the
 # current behaviour.  When ``False``, approach notes remain unchanged.
 CONVERTIR_APROX_A_ESTRUCT = False
+
+
+def _pitch_classes_en_acorde(cifrado: str) -> Set[int]:
+    """Devuelve las clases de altura del acorde indicado."""
+
+    try:
+        root, suf = parsear_nombre_acorde(cifrado)
+    except ValueError:
+        base = re.sub(r"maj", "∆", cifrado, flags=re.IGNORECASE)
+        base = re.sub(r"(9|11|13)$", "", base)
+        root, suf = parsear_nombre_acorde(base)
+
+    return {(root + interval) % 12 for interval in INTERVALOS_TRADICIONALES[suf]}
+
+
+def _preferir_aproximacion_vecina(
+    pitch: int, prev_classes: Optional[Set[int]], next_classes: Optional[Set[int]]
+) -> int:
+    """Ajusta una nota de aproximación hacia sonidos compartidos.
+
+    Si la nota de aproximación está a un semitono de un sonido presente en el
+    acorde previo o siguiente, se desplaza hacia ese sonido para favorecer la
+    continuidad melódica.
+    """
+
+    pc = pitch % 12
+    candidatos: List[Tuple[int, int, int]] = []  # (desplazamiento, prioridad, pitch)
+
+    def _registrar(opcionales: Optional[Set[int]], prioridad: int) -> None:
+        if not opcionales:
+            return
+        if pc in opcionales:
+            candidatos.append((0, prioridad, pitch))
+            return
+        for delta in (-1, 1):
+            candidato_pc = (pc + delta) % 12
+            if candidato_pc in opcionales:
+                candidatos.append((abs(delta), prioridad, pitch + delta))
+
+    _registrar(prev_classes, 0)
+    _registrar(next_classes, 1)
+
+    if not candidatos:
+        return pitch
+
+    candidatos.sort()
+    return candidatos[0][2]
 
 
 def _ajustar_a_estructural_mas_cercano(note_name: str, cifrado: str, pitch: int) -> int:
@@ -525,6 +572,10 @@ def montuno_salsa(
             mapa[ix] = i
         limites[i] = idxs[-1] + 1
 
+    clases_por_acorde: Dict[int, Set[int]] = {}
+    for idx, (cifrado, _, _, _) in enumerate(asignaciones):
+        clases_por_acorde[idx] = _pitch_classes_en_acorde(cifrado)
+
     offset_octava: Dict[int, int] = {}
     for i, etiqueta in enumerate(octavaciones):
         offset_octava[i] = _offset_octavacion(etiqueta)
@@ -568,12 +619,18 @@ def montuno_salsa(
         ajuste = ajuste_por_acorde.get(idx_acorde, 0)
         grupos_act = grupos_por_inv
         ref_idx = (inicio_cor + cor + offset_ref) % total_ref_cor
+        prev_classes = clases_por_acorde.get(idx_acorde - 1)
+        next_classes = clases_por_acorde.get(idx_acorde + 1)
         for pos in grupos_act[inv][ref_idx]:
             pitch, es_aprox = traducir_nota(pos["name"], acorde)
             comienzo = asignaciones[idx_acorde][1][0]
             if CONVERTIR_APROX_A_ESTRUCT and es_aprox and cor == comienzo:
                 pitch = _ajustar_a_estructural_mas_cercano(
                     pos["name"], cifrado=acorde, pitch=pitch
+                )
+            elif es_aprox:
+                pitch = _preferir_aproximacion_vecina(
+                    pitch, prev_classes, next_classes
                 )
             inicio = cor * grid + pos["start"]
             fin = cor * grid + pos["end"]
