@@ -337,7 +337,7 @@ export function nudgeChordBass(index: number, direction: 1 | -1): void {
   const sign: 1 | -1 = direction >= 0 ? 1 : -1;
 
   for (let step = 0; step < steps; step += 1) {
-    const target = stepInversionPitch(chord.name, pitch, sign);
+    const target = stepInversionPitch(chord.name, pitch, sign, inversion);
     pitch = target.pitch;
     inversion = target.inversion;
   }
@@ -366,7 +366,7 @@ export function shiftAllInversions(delta: number): void {
     let pitch = current.pitch;
     let inversion = current.inversion;
     for (let step = 0; step < steps; step += 1) {
-      const target = stepInversionPitch(chord.name, pitch, direction);
+      const target = stepInversionPitch(chord.name, pitch, direction, inversion);
       pitch = target.pitch;
       inversion = target.inversion;
     }

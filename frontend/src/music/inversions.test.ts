@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ChordConfig } from '../types';
+import type { ChordConfig, Inversion, ResolvedChordInversion } from '../types';
 import {
   calculateBassPitch,
   formatMidiNote,
@@ -78,28 +78,56 @@ describe('resolveInversionChain', () => {
 describe('stepInversionPitch', () => {
   it('repite las notas del acorde hacia el registro agudo al subir', () => {
     const startPitch = 48; // C3
+    let currentInversion: Inversion = 'root';
 
-    const up1 = stepInversionPitch('Cmaj7', startPitch, 1);
-    const up2 = stepInversionPitch('Cmaj7', up1.pitch, 1);
-    const up3 = stepInversionPitch('Cmaj7', up2.pitch, 1);
-    const up4 = stepInversionPitch('Cmaj7', up3.pitch, 1);
+    const up1 = stepInversionPitch('Cmaj7', startPitch, 1, currentInversion);
+    currentInversion = up1.inversion;
+    const up2 = stepInversionPitch('Cmaj7', up1.pitch, 1, currentInversion);
+    currentInversion = up2.inversion;
+    const up3 = stepInversionPitch('Cmaj7', up2.pitch, 1, currentInversion);
+    currentInversion = up3.inversion;
+    const up4 = stepInversionPitch('Cmaj7', up3.pitch, 1, currentInversion);
 
     expect(up1.pitch).toBeGreaterThan(startPitch);
     expect(up2.pitch).toBeGreaterThan(up1.pitch);
     expect(up3.pitch).toBeGreaterThan(up2.pitch);
     expect(up4.pitch).toBeGreaterThan(up3.pitch);
-    expect(up4.inversion).toBe('root');
+    expect(up4.inversion).toBe('third');
   });
 
   it('recorre las notas hacia el grave al bajar', () => {
     const startPitch = 72; // C5
+    let currentInversion: Inversion = 'root';
 
-    const down1 = stepInversionPitch('Cmaj7', startPitch, -1);
-    const down2 = stepInversionPitch('Cmaj7', down1.pitch, -1);
+    const down1 = stepInversionPitch('Cmaj7', startPitch, -1, currentInversion);
+    currentInversion = down1.inversion;
+    const down2 = stepInversionPitch('Cmaj7', down1.pitch, -1, currentInversion);
 
     expect(down1.pitch).toBeLessThan(startPitch);
     expect(down2.pitch).toBeLessThan(down1.pitch);
-    expect(down1.inversion).toBe('seventh');
+    expect(down1.inversion).toBe('fifth');
+  });
+
+  it('avanza las inversiones sin retroceder por salto en cualquier acorde', () => {
+    const startPitch = 52; // E3
+    let currentInversion: Inversion = 'fifth';
+
+    const steps: ResolvedChordInversion[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const next = stepInversionPitch('Am7', i === 0 ? startPitch : steps[i - 1]!.pitch, 1, currentInversion);
+      steps.push(next);
+      currentInversion = next.inversion;
+    }
+
+    expect(steps.map((s) => s.pitch)).toEqual([57, 60, 64, 69, 72]);
+  });
+
+  it('no baja de registro al subir aunque la inversión inicial no esté en la rotación', () => {
+    const startPitch = calculateBassPitch('G7', 'seventh', null, 1, false);
+
+    const next = stepInversionPitch('G7', startPitch, 1, 'seventh');
+
+    expect(next.pitch).toBeGreaterThan(startPitch);
   });
 });
 
