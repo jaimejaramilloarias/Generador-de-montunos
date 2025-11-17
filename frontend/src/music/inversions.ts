@@ -154,6 +154,25 @@ export function stepInversionPitch(
     while (pitch >= currentPitch - 1e-6) {
       pitch -= SEMITONES_IN_OCTAVE;
     }
+
+  const safeCurrent = currentIdx === -1 ? pitchClasses[0] : pitchClasses[currentIdx];
+
+  const targetIdx =
+    currentIdx === -1
+      ? (direction === 1 ? 1 : pitchClasses.length - 1) % pitchClasses.length
+      : (currentIdx + direction + pitchClasses.length) % pitchClasses.length;
+  const target = pitchClasses[targetIdx];
+
+  const registerOffset = deriveRegisterOffset(chordName, safeCurrent.inversion, currentPitch);
+  const basePitch = inversionBasePitch(chordName, target.inversion);
+  let pitch = basePitch + registerOffset * SEMITONES_IN_OCTAVE;
+
+  if (direction === 1 && pitch <= currentPitch + 1e-6) {
+    pitch += SEMITONES_IN_OCTAVE;
+  }
+  if (direction === -1 && pitch >= currentPitch - 1e-6) {
+    pitch -= SEMITONES_IN_OCTAVE;
+main
   }
 
   return { inversion: target.inversion, pitch } satisfies ResolvedChordInversion;
