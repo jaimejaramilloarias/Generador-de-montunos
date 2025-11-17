@@ -6,6 +6,11 @@ let setProgression: (progression: string) => void;
 let saveCurrentProgression: (name: string) => void;
 let loadSavedProgression: (id: string) => void;
 let deleteSavedProgression: (id: string) => void;
+let setDefaultModo: (modo: AppState['modoDefault']) => void;
+let setChord: (
+  index: number,
+  patch: Partial<Pick<AppState['chords'][number], 'modo' | 'armonizacion' | 'inversion'>>
+) => void;
 
 async function importStore() {
   const store = await import('./store');
@@ -14,6 +19,8 @@ async function importStore() {
   saveCurrentProgression = store.saveCurrentProgression;
   loadSavedProgression = store.loadSavedProgression;
   deleteSavedProgression = store.deleteSavedProgression;
+  setDefaultModo = store.setDefaultModo;
+  setChord = store.setChord;
 }
 
 describe('state/store saved progressions', () => {
@@ -68,5 +75,25 @@ describe('state/store saved progressions', () => {
     expect(state.chords[0]?.inversion).toBeNull();
     expect(state.chords[1]?.modo).toBe('Extendido');
     expect(state.chords[2]?.modo).toBe('Tradicional');
+  });
+
+  it('permite cambiar el modo global a extendido', () => {
+    setProgression('Cmaj7 F7 | G7 Cmaj7');
+    setDefaultModo('Extendido');
+
+    const state = getState();
+    expect(state.chords.every((chord) => chord.modo === 'Extendido')).toBe(true);
+    expect(state.modoDefault).toBe('Extendido');
+  });
+
+  it('permite ajustar el modo de cualquier acorde, aunque el cifrado sea extendido', () => {
+    setProgression('Cmaj9 | Dm9 G9');
+    setChord(0, { modo: 'Tradicional' });
+    setChord(2, { modo: 'Salsa' });
+
+    const state = getState();
+    expect(state.chords[0]?.modo).toBe('Tradicional');
+    expect(state.chords[1]?.modo).toBe('Extendido');
+    expect(state.chords[2]?.modo).toBe('Salsa');
   });
 });
