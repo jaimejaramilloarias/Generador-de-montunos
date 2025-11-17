@@ -52,10 +52,9 @@ def _ajustar_a_estructural_mas_cercano(note_name: str, cifrado: str, pitch: int)
 # Función para elegir la mejor inversión para cada acorde
 # ========================
 
+# La única restricción de rango: la primera voz grave debe ubicarse entre C3 y C4.
 RANGO_BAJO_MIN = 48  # C3
-RANGO_BAJO_MAX = 67  # G4
-RANGO_EXTRA = 4  # flexible extension
-SALTO_MAX = 8  # minor sixth in semitones
+RANGO_BAJO_MAX = 60  # C4
 
 
 def _offset_octavacion(label: Optional[str]) -> int:
@@ -71,55 +70,34 @@ def _offset_octavacion(label: Optional[str]) -> int:
     return 0
 
 
-def _ajustar_rango(pitch: int) -> int:
-    """Confine ``pitch`` within ``RANGO_BAJO_MIN`` .. ``RANGO_BAJO_MAX``."""
+def _ajustar_rango_flexible(prev_pitch: Optional[int], pitch: int) -> int:
+    """Coloca ``pitch`` lo más cerca posible de ``prev_pitch``.
+
+    Solo se limita la nota inicial al rango C3–C4. Las notas siguientes se
+    ajustan por octavas para minimizar la distancia con la voz grave previa.
+    """
+
+    if prev_pitch is None:
+        return _ajustar_primera_voz_grave(pitch)
+
+    mejor = pitch
+    mejor_dist = abs(pitch - prev_pitch)
+    for offset in range(-5, 6):
+        candidato = pitch + 12 * offset
+        dist = abs(candidato - prev_pitch)
+        if dist < mejor_dist:
+            mejor = candidato
+            mejor_dist = dist
+    return mejor
+
+
+def _ajustar_primera_voz_grave(pitch: int) -> int:
+    """Garantiza que la primera nota grave quede entre C3 y C4."""
 
     while pitch < RANGO_BAJO_MIN:
         pitch += 12
     while pitch > RANGO_BAJO_MAX:
         pitch -= 12
-    return pitch
-
-
-def _ajustar_rango_ext(pitch: int) -> int:
-    """Confine ``pitch`` within the extended range."""
-
-    while pitch < RANGO_BAJO_MIN - RANGO_EXTRA:
-        pitch += 12
-    while pitch > RANGO_BAJO_MAX + RANGO_EXTRA:
-        pitch -= 12
-    return pitch
-
-
-def _ajustar_rango_flexible(prev_pitch: Optional[int], pitch: int) -> int:
-    """Prefer the fixed range but allow a small extension for smoother leaps."""
-
-    base = _ajustar_rango(pitch)
-    base = _ajustar_salto(prev_pitch, base)
-    base = _ajustar_rango(base)
-    base = _ajustar_salto(prev_pitch, base)
-    if prev_pitch is None:
-        return base
-    dist_base = abs(base - prev_pitch)
-    if dist_base <= SALTO_MAX:
-        return base
-
-    ext = _ajustar_rango_ext(pitch)
-    ext = _ajustar_salto(prev_pitch, ext)
-    ext = _ajustar_rango_ext(ext)
-    ext = _ajustar_salto(prev_pitch, ext)
-    return ext
-
-
-def _ajustar_salto(prev_pitch: Optional[int], pitch: int) -> int:
-    """Shift ``pitch`` by octaves so the leap from ``prev_pitch`` is <= ``SALTO_MAX``."""
-
-    if prev_pitch is None:
-        return pitch
-    while pitch - prev_pitch > SALTO_MAX:
-        pitch -= 12
-    while prev_pitch - pitch > SALTO_MAX:
-        pitch += 12
     return pitch
 
 
@@ -138,22 +116,27 @@ def get_bass_pitch(cifrado: str, inversion: str) -> int:
 
 
 def seleccionar_inversion(anterior: Optional[int], cifrado: str) -> Tuple[str, int]:
-    """Selecciona la inversión que genere el salto más corto (<= SALTO_MAX)."""
+    """Selecciona la inversión con la voz grave más cercana a ``anterior``.
 
-    mejores: List[Tuple[int, str, int]] = []
+    Si la voz grave previa pertenece al acorde actual, se reutiliza como bajo.
+    """
+
+    candidatos: List[Tuple[int, str, int, int]] = []
     for inv in INVERSIONS:
-        pitch = get_bass_pitch(cifrado, inv)
-        pitch = _ajustar_rango_flexible(anterior, pitch)
+        base_pitch = get_bass_pitch(cifrado, inv)
+        pitch = _ajustar_rango_flexible(anterior, base_pitch)
         distancia = 0 if anterior is None else abs(pitch - anterior)
-        mejores.append((distancia, inv, pitch))
+        candidatos.append((distancia, inv, pitch, base_pitch % 12))
 
-    mejores.sort()
-    mejor = mejores[0]
-    if anterior is not None and mejor[2] == anterior:
-        for opcion in mejores[1:]:
-            dist, inv, pitch = opcion
-            if dist <= SALTO_MAX and pitch != anterior:
-                return inv, pitch
+    if anterior is not None:
+        objetivo_pc = anterior % 12
+        coincidencias = [c for c in candidatos if c[3] == objetivo_pc]
+        if coincidencias:
+            coincidencias.sort()
+            return coincidencias[0][1], coincidencias[0][2]
+
+    candidatos.sort()
+    mejor = candidatos[0]
     return mejor[1], mejor[2]
 
 
