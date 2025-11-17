@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Optional
 import pretty_midi
 
-from .voicings import parsear_nombre_acorde, INTERVALOS_TRADICIONALES
+import re
+
+from .voicings import INTERVALOS_TRADICIONALES, parsear_nombre_acorde
 from .midi_utils import (
     _grid_and_bpm,
     procesar_progresion_en_grupos,
@@ -18,7 +20,7 @@ from .midi_utils import (
 # ========================
 # Inversiones disponibles
 # ========================
-INVERSIONS = ["root", "third", "fifth"]
+INVERSIONS = ["root", "third", "fifth", "seventh"]
 
 # Notas que funcionan como aproximaciones en las plantillas de salsa.  Si el
 # acorde cambia justo al inicio de la figura se ajustan al sonido estructural
@@ -34,7 +36,12 @@ CONVERTIR_APROX_A_ESTRUCT = False
 def _ajustar_a_estructural_mas_cercano(note_name: str, cifrado: str, pitch: int) -> int:
     """Devuelve la fundamental, tercera o quinta más cercana a ``pitch``."""
 
-    root, suf = parsear_nombre_acorde(cifrado)
+    try:
+        root, suf = parsear_nombre_acorde(cifrado)
+    except ValueError:
+        base = re.sub(r"maj", "∆", cifrado, flags=re.IGNORECASE)
+        base = re.sub(r"(9|11|13)$", "", base)
+        root, suf = parsear_nombre_acorde(base)
     ints = INTERVALOS_TRADICIONALES[suf]
     octave = int(note_name[-1])
 
@@ -103,7 +110,12 @@ def _ajustar_primera_voz_grave(pitch: int) -> int:
 
 def get_bass_pitch(cifrado: str, inversion: str) -> int:
     """Devuelve la nota MIDI de la voz grave para el acorde e inversión dada."""
-    root, suf = parsear_nombre_acorde(cifrado)
+    try:
+        root, suf = parsear_nombre_acorde(cifrado)
+    except ValueError:
+        base = re.sub(r"maj", "∆", cifrado, flags=re.IGNORECASE)
+        base = re.sub(r"(9|11|13)$", "", base)
+        root, suf = parsear_nombre_acorde(base)
     ints = INTERVALOS_TRADICIONALES[suf]
     if inversion == "root":
         return root + 12 * 3  # C3 por default
@@ -111,6 +123,8 @@ def get_bass_pitch(cifrado: str, inversion: str) -> int:
         return (root + ints[1]) % 12 + 12 * 3  # Tercera en C3, E3, etc.
     elif inversion == "fifth":
         return (root + ints[2]) % 12 + 12 * 3  # Quinta en G3, etc.
+    elif inversion == "seventh":
+        return (root + ints[3]) % 12 + 12 * 3  # Séptima en C3, B3, etc.
     else:
         raise ValueError(f"Inversión desconocida: {inversion}")
 
@@ -486,9 +500,15 @@ def montuno_salsa(
     base = "_".join(parts[:2]) if len(parts) >= 2 else midi_ref.stem
     if len(parts) >= 4:
         variante = parts[-1]
+    plantilla_defecto: Optional[pretty_midi.PrettyMIDI] = None
     for inv in INVERSIONS:
         path = midi_ref.parent / f"{base}_{inv}_{variante}.mid"
-        plantillas[inv] = pretty_midi.PrettyMIDI(str(path))
+        try:
+            plantillas[inv] = pretty_midi.PrettyMIDI(str(path))
+        except FileNotFoundError:
+            if plantilla_defecto is None:
+                plantilla_defecto = pretty_midi.PrettyMIDI(str(midi_ref))
+            plantillas[inv] = plantilla_defecto
 
     # Número real de corcheas en la progresión según el patrón de clave
     total_dest_cor = max(i for _, idxs, _, _ in asignaciones for i in idxs) + 1
@@ -537,6 +557,7 @@ def montuno_salsa(
         ajuste_por_acorde[idx] = 12 * round(diff / 12)
 
     notas_finales: List[pretty_midi.Note] = []
+    notas_por_acorde: Dict[int, List[pretty_midi.Note]] = {i: [] for i in range(len(asignaciones))}
     for cor in range(total_dest_cor):
         inv = inv_por_cor.get(cor)
         if inv is None:
@@ -560,14 +581,21 @@ def montuno_salsa(
             end = min(fin, fin_limite)
             if end <= inicio:
                 continue
-            notas_finales.append(
-                pretty_midi.Note(
-                    velocity=pos["velocity"],
-                    pitch=pitch + octava + ajuste,
-                    start=inicio,
-                    end=end,
-                )
+            note_obj = pretty_midi.Note(
+                velocity=pos["velocity"],
+                pitch=pitch + octava + ajuste,
+                start=inicio,
+                end=end,
             )
+            notas_finales.append(note_obj)
+            notas_por_acorde[idx_acorde].append(note_obj)
+
+    for idx, objetivo in bajos_objetivo.items():
+        notas = [n for n in notas_por_acorde.get(idx, []) if n.pitch > 0]
+        if not notas:
+            continue
+        nota_grave = min(notas, key=lambda n: n.pitch)
+        nota_grave.pitch = objetivo
 
     # ------------------------------------------------------------------
     # Ajuste final de duración y bpm igual que en el modo tradicional
