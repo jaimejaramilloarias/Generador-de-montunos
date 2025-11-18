@@ -16,6 +16,7 @@ export interface RawGenerationInput {
     armonizacion: AppState['armonizacionDefault'];
     octavacion: AppState['octavacionDefault'];
     inversion: AppState['inversionDefault'] | null;
+    approachNotes: string[];
   }[];
   referenceRoot: string;
   manualEdits: {

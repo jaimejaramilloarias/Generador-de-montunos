@@ -772,6 +772,19 @@ input[type='number'] {
   padding: 0.35rem 0.5rem;
 }
 
+.signal-viewer__input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+}
+
+.signal-viewer__field--stretch {
+  min-width: 220px;
+}
+
 .signal-viewer__field--disabled .signal-viewer__select {
   opacity: 0.6;
   cursor: not-allowed;

@@ -18,6 +18,7 @@ import {
   MODOS,
   OCTAVACIONES,
   VARIACIONES,
+  DEFAULT_SALSA_APPROACH_NOTES,
 } from '../types/constants';
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
@@ -148,6 +149,7 @@ function buildChords(
   progressionInput: string,
   base: Pick<AppState, 'modoDefault' | 'armonizacionDefault' | 'octavacionDefault' | 'chords'>
 ): { chords: ChordConfig[]; errors: string[] } {
+  const defaultApproach = DEFAULT_SALSA_APPROACH_NOTES.join(', ');
   const parsed = parseProgression(progressionInput, { armonizacionDefault: base.armonizacionDefault });
   const previous = base.chords;
   const chords = parsed.chords.map((chord, index) => {
@@ -156,6 +158,7 @@ function buildChords(
     const octavacion = prev?.octavacion ?? base.octavacionDefault;
     const forcedInversion = chord.forcedInversion ?? null;
     const isExtended = isExtendedChordName(chord.name);
+    const approachNotes = prev?.approachNotes ?? defaultApproach;
 
     if (prev && prev.name === chord.name) {
       const nextInversion = forcedInversion ?? prev.inversion ?? null;
@@ -168,6 +171,7 @@ function buildChords(
         octavacion,
         inversion: nextInversion,
         registerOffset: prev.registerOffset ?? 0,
+        approachNotes,
         isRecognized: chord.isRecognized,
       } satisfies ChordConfig;
     }
@@ -181,6 +185,7 @@ function buildChords(
       octavacion: base.octavacionDefault,
       inversion: forcedInversion,
       registerOffset: 0,
+      approachNotes,
       isRecognized: chord.isRecognized,
     } satisfies ChordConfig;
   });

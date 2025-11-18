@@ -5,6 +5,7 @@ interface ViewerActions {
   onBassNudge?: (index: number, direction: 1 | -1) => void;
   onModeChange?: (index: number, mode: Modo) => void;
   onArmonizacionChange?: (index: number, armonizacion: Armonizacion) => void;
+  onApproachChange?: (index: number, notes: string) => void;
 }
 
 interface ViewerState {
@@ -266,6 +267,11 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
           }
         );
         primaryControls.append(armonizacionField.wrapper);
+      } else if (chord.modo === 'Salsa') {
+        const approachField = buildTextField('Aproximaciones', chord.approachNotes, (value) => {
+          actions.onApproachChange?.(chord.index, value);
+        });
+        primaryControls.append(approachField.wrapper);
       }
 
       const actionsRow = document.createElement('div');
@@ -328,5 +334,28 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
 
     wrapper.append(tag, select);
     return { wrapper, select };
+  }
+
+  function buildTextField(
+    label: string,
+    value: string,
+    onChange: (next: string) => void
+  ): { wrapper: HTMLDivElement; input: HTMLInputElement } {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'signal-viewer__field signal-viewer__field--stretch';
+
+    const tag = document.createElement('span');
+    tag.className = 'signal-viewer__tag';
+    tag.textContent = label;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'signal-viewer__input';
+    input.value = value;
+    input.placeholder = 'Ej: F, B';
+    input.addEventListener('input', (event) => onChange((event.target as HTMLInputElement).value));
+
+    wrapper.append(tag, input);
+    return { wrapper, input };
   }
 }

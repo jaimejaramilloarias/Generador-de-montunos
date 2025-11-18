@@ -13,6 +13,7 @@ export interface ChordConfig {
   octavacion: Octavacion;
   inversion: Inversion | null;
   registerOffset: number;
+  approachNotes: string;
   isRecognized: boolean;
 }
 

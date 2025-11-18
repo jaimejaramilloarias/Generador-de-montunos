@@ -75,6 +75,20 @@ def _is_extended_chord(symbol: str) -> bool:
     return any(token in sufijo for token in ("9", "11", "13"))
 
 
+def _normalise_nested_notes(
+    values: Optional[Sequence[Optional[Sequence[str]]]], length: int
+) -> List[Optional[List[str]]]:
+    result: List[Optional[List[str]]] = []
+    for idx in range(length):
+        raw = values[idx] if values and idx < len(values) else None
+        if raw is None:
+            result.append(None)
+            continue
+        cleaned = [str(item).strip() for item in raw if str(item).strip()]
+        result.append(cleaned or None)
+    return result
+
+
 def generate_montuno(
     progression_text: str,
     *,
@@ -89,6 +103,7 @@ def generate_montuno(
     inversion: str,
     reference_root: Path,
     inversiones_por_indice: Optional[Sequence[Optional[str]]] = None,
+    aproximaciones_por_indice: Optional[Sequence[Optional[Sequence[str]]]] = None,
     manual_edits: Optional[List[Dict]] = None,
     seed: Optional[int] = None,
     bpm: float = 120.0,
@@ -120,6 +135,7 @@ def generate_montuno(
             octavas_por_indice, octavacion_default, num_chords
         )
         inversiones = _normalise_optional_sequence(inversiones_por_indice, num_chords)
+        aproximaciones = _normalise_nested_notes(aproximaciones_por_indice, num_chords)
 
         inversion_limpia = limpiar_inversion(inversion)
 
@@ -218,6 +234,8 @@ def generate_montuno(
                 kwargs["octavaciones_custom"] = oct_seg
 
                 if segmento.mode == "Salsa":
+                    aprox_seg = [aproximaciones[i] for i in segmento.chord_indices]
+                    kwargs["aproximaciones_por_acorde"] = aprox_seg
                     if any(inv_seg):
                         kwargs["inversiones_manual"] = inv_seg
                 else:

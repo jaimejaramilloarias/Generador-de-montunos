@@ -17,6 +17,7 @@ function buildChord(index: number, name: string, inversion: ChordConfig['inversi
     inversion,
     registerOffset: 0,
     modo: 'Tradicional',
+    approachNotes: 'D, A, B, D#, F, G#, C#',
     isRecognized: true,
   } satisfies ChordConfig;
 }
