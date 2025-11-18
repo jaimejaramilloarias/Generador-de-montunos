@@ -16,6 +16,7 @@ import {
   setIsPlaying,
   setIsGenerating,
   setProgression,
+  setSeed,
   subscribe,
   resetChordOverrides,
 } from '../state/store';
