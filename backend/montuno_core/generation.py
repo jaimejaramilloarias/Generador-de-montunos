@@ -241,9 +241,11 @@ def generate_montuno(
                 kwargs = {"asignaciones_custom": asign_seg}
                 inv_seg = [inversiones[i] for i in segmento.chord_indices]
                 bass_seg = [bass_targets[i] for i in segmento.chord_indices]
+                reg_seg = [register_offsets_norm[i] for i in segmento.chord_indices]
                 oct_seg = [octavaciones[i] for i in segmento.chord_indices]
                 kwargs["octavacion_default"] = octavacion_default
                 kwargs["octavaciones_custom"] = oct_seg
+                kwargs["register_offsets"] = reg_seg
 
                 if segmento.mode == "Salsa":
                     aprox_seg = [aproximaciones[i] for i in segmento.chord_indices]
