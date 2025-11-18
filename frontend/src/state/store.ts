@@ -145,6 +145,7 @@ function createInitialState(): AppState {
 }
 
 let state: AppState = createInitialState();
+const MAX_REGISTER_OFFSET = 4;
 
 function emit(): void {
   listeners.forEach((listener) => listener(state));
@@ -285,6 +286,10 @@ export function setDefaultOctavacion(octavacion: AppState['octavacionDefault']):
   markDirty();
 }
 
+function clampRegisterOffset(offset: number): number {
+  return Math.max(-MAX_REGISTER_OFFSET, Math.min(MAX_REGISTER_OFFSET, offset));
+}
+
 export function setDefaultInversion(inversion: Inversion): void {
   const chords = state.chords.map((chord) =>
     chord.inversion === null ? chord : { ...chord, inversion, registerOffset: 0 }
@@ -352,6 +357,26 @@ export function setChord(
       : next.approachNotes;
     return next;
   });
+  updateState({ chords });
+  markDirty();
+}
+
+export function shiftChordOctave(index: number, delta: number): void {
+  if (!delta) {
+    return;
+  }
+
+  const chords = state.chords.map((chord) => {
+    if (chord.index !== index) {
+      return chord;
+    }
+    const nextOffset = clampRegisterOffset((chord.registerOffset ?? 0) + delta);
+    if (nextOffset === chord.registerOffset) {
+      return chord;
+    }
+    return { ...chord, registerOffset: nextOffset } satisfies ChordConfig;
+  });
+
   updateState({ chords });
   markDirty();
 }
@@ -425,6 +450,23 @@ export function shiftAllInversions(delta: number): void {
 
     return { ...chord, inversion, registerOffset } satisfies ChordConfig;
   });
+  updateState({ chords });
+  markDirty();
+}
+
+export function shiftAllOctaves(delta: number): void {
+  if (!delta) {
+    return;
+  }
+
+  const chords = state.chords.map((chord) => {
+    const nextOffset = clampRegisterOffset((chord.registerOffset ?? 0) + delta);
+    if (nextOffset === chord.registerOffset) {
+      return chord;
+    }
+    return { ...chord, registerOffset: nextOffset } satisfies ChordConfig;
+  });
+
   updateState({ chords });
   markDirty();
 }

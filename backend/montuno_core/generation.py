@@ -135,6 +135,10 @@ def generate_montuno(
         inversiones = _normalise_optional_sequence(inversiones_por_indice, num_chords)
         aproximaciones = _normalise_nested_notes(aproximaciones_por_indice, num_chords)
 
+        for idx, modo in enumerate(modos):
+            if modo != "Salsa":
+                aproximaciones[idx] = None
+
         inversion_limpia = limpiar_inversion(inversion)
 
         default_inversions, bass_targets = calc_default_inversions(

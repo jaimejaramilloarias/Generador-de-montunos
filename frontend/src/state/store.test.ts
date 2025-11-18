@@ -15,6 +15,8 @@ let setChord: (
 ) => void;
 let recalculateInversions: () => void;
 let resetChordOverrides: () => void;
+let shiftChordOctave: (index: number, delta: number) => void;
+let shiftAllOctaves: (delta: number) => void;
 
 async function importStore() {
   const store = await import('./store');
@@ -27,6 +29,8 @@ async function importStore() {
   setChord = store.setChord;
   recalculateInversions = store.recalculateInversions;
   resetChordOverrides = store.resetChordOverrides;
+  shiftChordOctave = store.shiftChordOctave;
+  shiftAllOctaves = store.shiftAllOctaves;
 }
 
 describe('state/store saved progressions', () => {
@@ -116,5 +120,34 @@ describe('state/store saved progressions', () => {
 
     const state = getState();
     expect(state.chords[0]?.inversion).toBe('root');
+  });
+
+  it('permite transponer una octava por acorde sin modificar los demás', () => {
+    setProgression('Cmaj7 F7');
+
+    shiftChordOctave(1, 1);
+
+    let state = getState();
+    expect(state.chords[0]?.registerOffset).toBe(0);
+    expect(state.chords[1]?.registerOffset).toBe(1);
+
+    shiftChordOctave(1, -2);
+
+    state = getState();
+    expect(state.chords[1]?.registerOffset).toBe(-1);
+  });
+
+  it('aplica la transposición global respetando el límite de octavas', () => {
+    setProgression('Cmaj7 F7');
+
+    shiftAllOctaves(3);
+    shiftAllOctaves(3);
+
+    let state = getState();
+    expect(state.chords.every((chord) => chord.registerOffset <= 4)).toBe(true);
+
+    shiftAllOctaves(-10);
+    state = getState();
+    expect(state.chords.every((chord) => chord.registerOffset >= -4)).toBe(true);
   });
 });
