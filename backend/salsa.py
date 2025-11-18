@@ -75,10 +75,70 @@ def _pc_to_note(pc: int, use_flats: bool) -> str:
     names = flat_names if use_flats else sharp_names
     return names[pc]
 
+_NOTE_NAME_TO_PC = {
+    "C": 0,
+    "C#": 1,
+    "Db": 1,
+    "D": 2,
+    "D#": 3,
+    "Eb": 3,
+    "E": 4,
+    "F": 5,
+    "F#": 6,
+    "Gb": 6,
+    "G": 7,
+    "G#": 8,
+    "Ab": 8,
+    "A": 9,
+    "A#": 10,
+    "Bb": 10,
+    "B": 11,
+}
+
+_NATURAL_PC_BY_LETTER = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+
 
 def _detalles_intervalos(cifrado: str) -> Tuple[int, List[int]]:
     root, suf = _parsear_cifrado_seguro(cifrado)
     return root, INTERVALOS_TRADICIONALES[suf]
+
+
+def _note_name_to_pc(note: str) -> Optional[int]:
+    normalizada = _normalizar_nota_tonal(note)
+    if normalizada is None:
+        return None
+    return _NOTE_NAME_TO_PC.get(normalizada)
+
+
+def _pc_distance(a: int, b: int) -> int:
+    """Distancia mínima entre dos clases de altura."""
+
+    return min((a - b) % 12, (b - a) % 12)
+
+
+def _closest_diff_for_letter(letter: str, pc: int) -> Optional[int]:
+    natural = _NATURAL_PC_BY_LETTER.get(letter.upper())
+    if natural is None:
+        return None
+    opciones = [pc - natural, pc - natural + 12, pc - natural - 12]
+    return min(opciones, key=lambda diff: (abs(diff), diff))
+
+
+def _is_pc_for_letter(letter: str, pc: int, max_distance: int = 2) -> bool:
+    diff = _closest_diff_for_letter(letter, pc)
+    return diff is not None and abs(diff) <= max_distance
+
+
+def _note_name_for_letter(letter: str, pc: int) -> str:
+    diff = _closest_diff_for_letter(letter, pc)
+    if diff is None:
+        return letter.upper()
+    accidental = ""
+    if diff > 0:
+        accidental = "#" * diff
+    elif diff < 0:
+        accidental = "b" * abs(diff)
+    return f"{letter.upper()}{accidental}"
 
 
 def _calcular_aproximaciones_default(cifrado: str) -> List[str]:
@@ -143,17 +203,74 @@ def _normalizar_lista_aproximaciones(raw: Optional[Iterable[str]], defaults: Lis
     return cleaned[:4]
 
 
+def _ajustar_aproximaciones_por_contexto(
+    aproximaciones_por_acorde: List[List[str]],
+    asignaciones: List[Tuple[str, List[int], str, Optional[str]]],
+) -> List[List[str]]:
+    if not aproximaciones_por_acorde:
+        return []
+
+    estructurales = [_pitch_classes_en_acorde(cifrado) for cifrado, _, _, _ in asignaciones]
+    resultado: List[List[str]] = []
+
+    for idx, notas in enumerate(aproximaciones_por_acorde):
+        vecinos: Set[int] = set()
+        if idx > 0:
+            vecinos.update(estructurales[idx - 1])
+        if idx + 1 < len(estructurales):
+            vecinos.update(estructurales[idx + 1])
+        if not vecinos:
+            resultado.append(notas)
+            continue
+
+        ajustadas: List[str] = []
+        for nota in notas:
+            pc_original = _note_name_to_pc(nota)
+            if pc_original is None:
+                ajustadas.append(nota)
+                continue
+
+            letra = nota[0].upper()
+            mejor_pc = pc_original
+            mejor_dist = None
+            for candidato in vecinos:
+                if not _is_pc_for_letter(letra, candidato):
+                    continue
+                dist = _pc_distance(pc_original, candidato)
+                if mejor_dist is None or dist < mejor_dist:
+                    mejor_dist = dist
+                    mejor_pc = candidato
+
+            if mejor_dist is not None and mejor_pc != pc_original:
+                ajustadas.append(_note_name_for_letter(letra, mejor_pc))
+            else:
+                ajustadas.append(nota)
+
+        resultado.append(ajustadas)
+
+    return resultado
+
+
 def _preparar_aproximaciones(
     aproximaciones_por_acorde: Optional[List[Optional[List[str]]]],
     asignaciones: List[Tuple[str, List[int], str, Optional[str]]],
 ) -> List[Dict[str, object]]:
-    aproximaciones: List[Dict[str, object]] = []
+    notas_por_acorde: List[List[str]] = []
     for idx, (cifrado, _, _, _) in enumerate(asignaciones):
         defaults = _calcular_aproximaciones_default(cifrado)
-        raw = aproximaciones_por_acorde[idx] if aproximaciones_por_acorde and idx < len(aproximaciones_por_acorde) else None
-        notas = _normalizar_lista_aproximaciones(raw, defaults)
-        aproximaciones.append({"tokens": set(APPROACH_NOTES), "notas": notas})
-    return aproximaciones
+        raw = (
+            aproximaciones_por_acorde[idx]
+            if aproximaciones_por_acorde and idx < len(aproximaciones_por_acorde)
+            else None
+        )
+        notas_por_acorde.append(_normalizar_lista_aproximaciones(raw, defaults))
+
+    ajustadas = _ajustar_aproximaciones_por_contexto(notas_por_acorde, asignaciones)
+
+    return [
+        {"tokens": set(APPROACH_NOTES), "notas": notas}
+        for notas in ajustadas
+    ]
 
 
 def _pitch_classes_en_acorde(cifrado: str) -> Set[int]:
@@ -313,9 +430,8 @@ def _intervalo_por_nota_aproximacion(
     index_map = {"2": 0, "4": 1, "6": 2, "7": 3}
     idx = index_map[role]
     nota_objetivo = notas[idx] if idx < len(notas) else defaults[idx]
-    pc_map = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
-    pc = pc_map.get(nota_objetivo, 0)
-    return (pc - root) % 12
+    pc = _note_name_to_pc(nota_objetivo)
+    return ((pc if pc is not None else 0) - root) % 12
 
 
 def traducir_nota(
