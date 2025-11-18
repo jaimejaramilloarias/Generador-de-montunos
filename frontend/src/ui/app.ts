@@ -56,7 +56,6 @@ interface UiRefs {
   playBtn: HTMLButtonElement;
   downloadBtn: HTMLButtonElement;
   errorList: HTMLDivElement;
-  summary: HTMLDivElement;
   signalViewer: HTMLDivElement;
   signalOpenLink: HTMLAnchorElement;
   chordHints: HTMLDivElement;
@@ -463,12 +462,6 @@ function buildLayout(): string {
         </form>
 
         <section class="panel__section panel__section--editor" aria-label="Editor MIDI Signal">
-          <div class="summary summary--compact" aria-live="polite">
-            <h2>Resultado</h2>
-            <div id="summary-content" class="summary__content">
-              <p>Genera un montuno para ver los detalles de duración, compases y variaciones.</p>
-            </div>
-          </div>
           <section class="signal-embed">
             <div class="signal-embed__header">
               <div>
@@ -551,24 +544,23 @@ function grabRefs(root: HTMLElement): UiRefs {
     progressionInput: root.querySelector<HTMLTextAreaElement>('#progression')!,
     claveSelect: root.querySelector<HTMLSelectElement>('#clave')!,
     modoSelect: root.querySelector<HTMLSelectElement>('#modo')!,
-  armonizacionSelect: root.querySelector<HTMLSelectElement>('#armonizacion')!,
-  armonizacionContainer: root.querySelector<HTMLDivElement>('#armonizacion-default')!,
-  octavacionSelect: root.querySelector<HTMLSelectElement>('#octavacion')!,
-  bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
-  inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
-  inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
-  recalculateInversionsBtn: root.querySelector<HTMLButtonElement>('#recalculate-inversions')!,
-  generateBtn: root.querySelector<HTMLButtonElement>('#generate')!,
-  playBtn: root.querySelector<HTMLButtonElement>('#play')!,
-  downloadBtn: root.querySelector<HTMLButtonElement>('#download')!,
-  errorList: root.querySelector<HTMLDivElement>('#errors')!,
-  summary: root.querySelector<HTMLDivElement>('#summary-content')!,
-  signalViewer: root.querySelector<HTMLDivElement>('#signal-viewer')!,
-  signalOpenLink: root.querySelector<HTMLAnchorElement>('#signal-open')!,
-  chordHints: root.querySelector<HTMLDivElement>('#chord-suffix-hints')!,
-  midiEnableBtn: root.querySelector<HTMLButtonElement>('#midi-enable')!,
-  midiOutputSelect: root.querySelector<HTMLSelectElement>('#midi-output')!,
-  midiStatusText: root.querySelector<HTMLParagraphElement>('#midi-status')!,
+    armonizacionSelect: root.querySelector<HTMLSelectElement>('#armonizacion')!,
+    armonizacionContainer: root.querySelector<HTMLDivElement>('#armonizacion-default')!,
+    octavacionSelect: root.querySelector<HTMLSelectElement>('#octavacion')!,
+    bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
+    inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
+    inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
+    recalculateInversionsBtn: root.querySelector<HTMLButtonElement>('#recalculate-inversions')!,
+    generateBtn: root.querySelector<HTMLButtonElement>('#generate')!,
+    playBtn: root.querySelector<HTMLButtonElement>('#play')!,
+    downloadBtn: root.querySelector<HTMLButtonElement>('#download')!,
+    errorList: root.querySelector<HTMLDivElement>('#errors')!,
+    signalViewer: root.querySelector<HTMLDivElement>('#signal-viewer')!,
+    signalOpenLink: root.querySelector<HTMLAnchorElement>('#signal-open')!,
+    chordHints: root.querySelector<HTMLDivElement>('#chord-suffix-hints')!,
+    midiEnableBtn: root.querySelector<HTMLButtonElement>('#midi-enable')!,
+    midiOutputSelect: root.querySelector<HTMLSelectElement>('#midi-output')!,
+    midiStatusText: root.querySelector<HTMLParagraphElement>('#midi-status')!,
   };
 }
 
@@ -832,7 +824,6 @@ function updateUi(state: AppState, refs: UiRefs): void {
   refs.armonizacionContainer.classList.toggle('is-hidden', !armonizacionEnabled);
 
   renderErrors(state.errors, refs);
-  renderSummary(state, refs.summary);
   renderSignalArea(state, refs);
   renderMidi(state, refs);
 
@@ -865,34 +856,6 @@ function renderErrors(errors: string[], refs: UiRefs): void {
     <ul>
       ${errors.map((error) => `<li>${error}</li>`).join('')}
     </ul>
-  `;
-}
-
-function renderSummary(state: AppState, container: HTMLDivElement): void {
-  if (state.isGenerating) {
-    container.innerHTML = `
-      <p><strong>Compases:</strong> Calculando…</p>
-      <p>Generando montuno, esto puede tardar unos segundos.</p>
-    `;
-    return;
-  }
-  if (!state.generated) {
-    container.innerHTML = '<p>Genera un montuno para ver los detalles de duración, compases y variaciones.</p>';
-    return;
-  }
-  const { generated } = state;
-  const references = generated.referenceFiles.map((file) => file.split('/').pop() ?? file);
-  const referencesHtml = references.length
-    ? `<p><strong>Plantillas base:</strong> ${references.join(', ')}</p>`
-    : '';
-  container.innerHTML = `
-    <p><strong>Compases:</strong> ${generated.lengthBars}</p>
-    <p><strong>Tempo:</strong> ${generated.bpm} bpm</p>
-    <p><strong>Duración estimada:</strong> ${generated.durationSeconds.toFixed(2)} s</p>
-    <p><strong>Modo resultante:</strong> ${generated.modoTag}</p>
-    <p><strong>Clave resultante:</strong> ${generated.claveTag}</p>
-    <p><strong>Clave seleccionada:</strong> ${state.clave}</p>
-    ${referencesHtml}
   `;
 }
 

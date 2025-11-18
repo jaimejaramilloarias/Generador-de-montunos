@@ -242,7 +242,7 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
 
       const name = document.createElement('div');
       name.className = 'signal-viewer__chord-name';
-      name.textContent = chord.name;
+      name.textContent = chord.label;
 
       const metaRow = document.createElement('div');
       metaRow.className = 'signal-viewer__chord-meta';

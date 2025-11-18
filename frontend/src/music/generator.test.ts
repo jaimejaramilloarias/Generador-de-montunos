@@ -29,6 +29,7 @@ describe('generateMontuno', () => {
     chords: [
       {
         index: 0,
+        label: 'Cmaj7',
         name: 'Cmaj7',
         modo: 'Tradicional',
         armonizacion: 'Octavas',
@@ -40,6 +41,7 @@ describe('generateMontuno', () => {
       },
       {
         index: 1,
+        label: 'F7',
         name: 'F7',
         modo: 'Tradicional',
         armonizacion: 'Octavas',
@@ -51,6 +53,7 @@ describe('generateMontuno', () => {
       },
       {
         index: 2,
+        label: 'G7',
         name: 'G7',
         modo: 'Tradicional',
         armonizacion: 'Octavas',
@@ -62,6 +65,7 @@ describe('generateMontuno', () => {
       },
       {
         index: 3,
+        label: 'Cmaj7',
         name: 'Cmaj7',
         modo: 'Tradicional',
         armonizacion: 'Octavas',

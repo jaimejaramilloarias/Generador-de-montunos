@@ -11,6 +11,7 @@ import {
 function buildChord(index: number, name: string, inversion: ChordConfig['inversion'] = null): ChordConfig {
   return {
     index,
+    label: name,
     name,
     armonizacion: 'Octavas',
     octavacion: 'Original',
