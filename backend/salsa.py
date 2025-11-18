@@ -580,6 +580,7 @@ def montuno_salsa(
     octavacion_default: Optional[str] = None,
     octavaciones_custom: Optional[List[str]] = None,
     aproximaciones_por_acorde: Optional[List[Optional[List[str]]]] = None,
+    register_offsets: Optional[List[int]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Genera montuno estilo salsa enlazando acordes e inversiones.
 
@@ -611,6 +612,13 @@ def montuno_salsa(
     # Selección de la inversión para cada acorde enlazando la voz grave
     # o usando la lista proporcionada por la interfaz
     # --------------------------------------------------------------
+    offsets_registro = register_offsets or []
+
+    def _offset_registro(idx: int) -> int:
+        if 0 <= idx < len(offsets_registro) and offsets_registro[idx] is not None:
+            return offsets_registro[idx] * 12
+        return 0
+
     if inversiones_manual is None:
         inversiones = []
         voz_grave_anterior = None
@@ -619,16 +627,16 @@ def montuno_salsa(
             octava = _offset_octavacion(octavaciones[idx])
             if idx == 0:
                 inv = inv_forzado or inversion_inicial
-                base_pitch = get_bass_pitch(cifrado, inv) + octava
+                base_pitch = get_bass_pitch(cifrado, inv) + octava + _offset_registro(idx)
                 pitch = _ajustar_rango_flexible(voz_grave_anterior, base_pitch)
             else:
                 if inv_forzado:
                     inv = inv_forzado
-                    base_pitch = get_bass_pitch(cifrado, inv) + octava
+                    base_pitch = get_bass_pitch(cifrado, inv) + octava + _offset_registro(idx)
                     pitch = _ajustar_rango_flexible(voz_grave_anterior, base_pitch)
                 else:
                     inv, pitch = seleccionar_inversion(
-                        voz_grave_anterior, cifrado, octava
+                        voz_grave_anterior, cifrado, octava + _offset_registro(idx)
                     )
             inversiones.append(inv)
             bajos_objetivo[idx] = pitch
@@ -640,8 +648,8 @@ def montuno_salsa(
         for idx, (cifrado, _, _, _) in enumerate(asignaciones):
             inv = inversiones[idx]
             octava = _offset_octavacion(octavaciones[idx])
-            base_pitch = get_bass_pitch(cifrado, inv) + octava
-            pitch = _ajustar_rango_flexible(voz_grave_anterior, base_pitch)
+            base_pitch = get_bass_pitch(cifrado, inv) + octava + _offset_registro(idx)
+            pitch = base_pitch
             bajos_objetivo[idx] = pitch
             voz_grave_anterior = pitch
 
