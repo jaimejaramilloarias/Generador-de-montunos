@@ -9,9 +9,12 @@ let deleteSavedProgression: (id: string) => void;
 let setDefaultModo: (modo: AppState['modoDefault']) => void;
 let setChord: (
   index: number,
-  patch: Partial<Pick<AppState['chords'][number], 'modo' | 'armonizacion' | 'octavacion' | 'inversion'>>
+  patch: Partial<
+    Pick<AppState['chords'][number], 'modo' | 'armonizacion' | 'octavacion' | 'inversion' | 'registerOffset'>
+  >
 ) => void;
 let recalculateInversions: () => void;
+let resetChordOverrides: () => void;
 
 async function importStore() {
   const store = await import('./store');
@@ -23,6 +26,7 @@ async function importStore() {
   setDefaultModo = store.setDefaultModo;
   setChord = store.setChord;
   recalculateInversions = store.recalculateInversions;
+  resetChordOverrides = store.resetChordOverrides;
 }
 
 describe('state/store saved progressions', () => {
@@ -70,44 +74,38 @@ describe('state/store saved progressions', () => {
     expect(state.activeProgressionId).toBeNull();
   });
 
-  it('detecta acordes extendidos y fuerza el modo extendido', () => {
-    setProgression('Cmaj9 | Dm7(9) G7');
-    const state = getState();
-    expect(state.chords[0]?.modo).toBe('Extendido');
-    expect(state.chords[0]?.inversion).toBeNull();
-    expect(state.chords[1]?.modo).toBe('Extendido');
-    expect(state.chords[2]?.modo).toBe('Tradicional');
-  });
-
-  it('permite cambiar el modo global a extendido', () => {
+  it('permite cambiar el modo global a salsa', () => {
     setProgression('Cmaj7 F7 | G7 Cmaj7');
-    setDefaultModo('Extendido');
+    setDefaultModo('Salsa');
 
     const state = getState();
-    expect(state.chords.every((chord) => chord.modo === 'Extendido')).toBe(true);
-    expect(state.modoDefault).toBe('Extendido');
+    expect(state.chords.every((chord) => chord.modo === 'Salsa')).toBe(true);
+    expect(state.modoDefault).toBe('Salsa');
   });
 
-  it('mantiene el modo extendido en acordes con tensiones al cambiar el modo global', () => {
-    setProgression('Cmaj9 | Dm7(9) G7');
-    setDefaultModo('Tradicional');
-
-    const state = getState();
-    expect(state.chords[0]?.modo).toBe('Extendido');
-    expect(state.chords[1]?.modo).toBe('Extendido');
-    expect(state.chords[2]?.modo).toBe('Tradicional');
-    expect(state.modoDefault).toBe('Tradicional');
-  });
-
-  it('permite ajustar el modo de cualquier acorde, aunque el cifrado sea extendido', () => {
-    setProgression('Cmaj9 | Dm9 G9');
-    setChord(0, { modo: 'Tradicional' });
-    setChord(2, { modo: 'Salsa' });
+  it('cambiar un acorde de salsa a tradicional sobrescribe los ajustes conflictivos', () => {
+    setDefaultModo('Salsa');
+    setProgression('Cmaj7 F7');
+    setChord(0, { modo: 'Tradicional', octavacion: 'Octava arriba', inversion: 'third', registerOffset: 2 });
 
     const state = getState();
     expect(state.chords[0]?.modo).toBe('Tradicional');
-    expect(state.chords[1]?.modo).toBe('Extendido');
-    expect(state.chords[2]?.modo).toBe('Salsa');
+    expect(state.chords[0]?.octavacion).toBe(state.octavacionDefault);
+    expect(state.chords[0]?.registerOffset).toBe(0);
+    expect(state.chords[0]?.inversion).toBe('third');
+  });
+
+  it('restablece los overrides al usar el botón global de reseteo', () => {
+    setProgression('Cmaj7 F7');
+    setChord(0, { modo: 'Salsa', octavacion: 'Octava abajo', inversion: 'fifth', registerOffset: -1 });
+
+    resetChordOverrides();
+
+    const state = getState();
+    expect(state.chords[0]?.modo).toBe(state.modoDefault);
+    expect(state.chords[0]?.octavacion).toBe(state.octavacionDefault);
+    expect(state.chords[0]?.inversion).toBeNull();
+    expect(state.chords[0]?.registerOffset).toBe(0);
   });
 
   it('recalcular inversiones restablece los enlaces ignorando overrides manuales', () => {

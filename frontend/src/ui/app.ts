@@ -19,6 +19,7 @@ import {
   setProgression,
   subscribe,
   recalculateInversions,
+  resetChordOverrides,
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, MODOS, OCTAVACIONES } from '../types/constants';
 import type { AppState, GenerationResult, MidiStatus } from '../types';
@@ -55,6 +56,7 @@ interface UiRefs {
   generateBtn: HTMLButtonElement;
   playBtn: HTMLButtonElement;
   downloadBtn: HTMLButtonElement;
+  resetOverridesBtn: HTMLButtonElement;
   errorList: HTMLDivElement;
   signalViewer: HTMLDivElement;
   signalOpenLink: HTMLAnchorElement;
@@ -510,6 +512,15 @@ function buildLayout(): string {
                 >
                   ♻
                 </button>
+                <button
+                  type="button"
+                  id="reset-overrides"
+                  class="icon-btn icon-btn--wide"
+                  title="Restablecer ajustes por acorde a los valores por defecto"
+                  aria-label="Restablecer overrides por acorde"
+                >
+                  ↺
+                </button>
               </div>
               <div class="signal-embed__cta-group">
                 <a
@@ -551,6 +562,7 @@ function grabRefs(root: HTMLElement): UiRefs {
     inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
     inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
     recalculateInversionsBtn: root.querySelector<HTMLButtonElement>('#recalculate-inversions')!,
+    resetOverridesBtn: root.querySelector<HTMLButtonElement>('#reset-overrides')!,
     generateBtn: root.querySelector<HTMLButtonElement>('#generate')!,
     playBtn: root.querySelector<HTMLButtonElement>('#play')!,
     downloadBtn: root.querySelector<HTMLButtonElement>('#download')!,
@@ -619,6 +631,10 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
 
   refs.recalculateInversionsBtn.addEventListener('click', () => {
     recalculateInversions();
+  });
+
+  refs.resetOverridesBtn.addEventListener('click', () => {
+    resetChordOverrides();
   });
 
   refs.midiEnableBtn.addEventListener('click', async () => {
@@ -835,6 +851,8 @@ function updateUi(state: AppState, refs: UiRefs): void {
   refs.playBtn.textContent = state.isPlaying ? '⏹' : '▶';
   refs.downloadBtn.disabled = state.isGenerating || !state.generated;
   refs.recalculateInversionsBtn.disabled =
+    state.isGenerating || progressionEmpty || hasBlockingErrors || state.chords.length === 0;
+  refs.resetOverridesBtn.disabled =
     state.isGenerating || progressionEmpty || hasBlockingErrors || state.chords.length === 0;
   refreshChordSuffixHints(refs);
 }

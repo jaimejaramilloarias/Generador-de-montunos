@@ -21,7 +21,6 @@ import {
 } from '../types/constants';
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
-import { isExtendedChordName } from '../utils/chords';
 import { deriveRegisterOffset, resolveInversionChain, stepInversionPitch } from '../music/inversions';
 import { deriveApproachNotes } from '../music/approachNotes';
 
@@ -157,22 +156,22 @@ function persist(): void {
 
 function buildChords(
   progressionInput: string,
-  base: Pick<AppState, 'modoDefault' | 'armonizacionDefault' | 'octavacionDefault' | 'chords'>
+  base: Pick<AppState, 'modoDefault' | 'armonizacionDefault' | 'octavacionDefault' | 'chords'>,
+  options?: { preserveOverrides?: boolean }
 ): { chords: ChordConfig[]; errors: string[] } {
   const parsed = parseProgression(progressionInput, { armonizacionDefault: base.armonizacionDefault });
-  const previous = base.chords;
+  const previous = options?.preserveOverrides === false ? [] : base.chords;
   const chords = parsed.chords.map((chord, index) => {
     const prev = previous[index];
     const armonizacion = chord.armonizacion ?? prev?.armonizacion ?? base.armonizacionDefault;
     const octavacion = prev?.octavacion ?? base.octavacionDefault;
     const forcedInversion = chord.forcedInversion ?? null;
-    const isExtended = isExtendedChordName(chord.name);
     const defaultApproach = deriveApproachNotes(chord.name);
     const approachNotes = normaliseApproachNotes(prev?.approachNotes ?? defaultApproach);
 
     if (prev && prev.name === chord.name) {
       const nextInversion = forcedInversion ?? prev.inversion ?? null;
-      const nextModo = isExtended ? prev.modo ?? 'Extendido' : prev.modo;
+      const nextModo = prev.modo ?? base.modoDefault;
       return {
         ...prev,
         index,
@@ -187,7 +186,7 @@ function buildChords(
       } satisfies ChordConfig;
     }
 
-    const nextModo = isExtended ? 'Extendido' : base.modoDefault;
+    const nextModo = base.modoDefault;
     return {
       index,
       label: chord.raw,
@@ -269,9 +268,7 @@ export function setProgression(progressionInput: string): void {
 }
 
 export function setDefaultModo(modo: Modo): void {
-  const chords = state.chords.map((chord) =>
-    isExtendedChordName(chord.name) ? chord : { ...chord, modo }
-  );
+  const chords = state.chords.map((chord) => ({ ...chord, modo }));
   updateState({ modoDefault: modo, chords });
   markDirty();
 }
@@ -329,18 +326,48 @@ export function setChord(
     if (chord.index !== index) {
       return chord;
     }
+    const patchIncludesModo = patch.modo !== undefined && patch.modo !== chord.modo;
+    const modoAdjustedPatch = patchIncludesModo
+      ? {
+          ...patch,
+          armonizacion: patch.modo === 'Tradicional' ? state.armonizacionDefault : chord.armonizacion,
+          approachNotes:
+            patch.modo === 'Salsa'
+              ? deriveApproachNotes(chord.name)
+              : normaliseApproachNotes(deriveApproachNotes(chord.name)),
+        }
+      : patch;
     const next: ChordConfig = {
       ...chord,
-      ...patch,
+      ...modoAdjustedPatch,
       ...(normalisedApproach !== undefined ? { approachNotes: normalisedApproach } : {}),
-      inversion: patch.inversion === undefined ? chord.inversion : patch.inversion,
+      inversion: modoAdjustedPatch.inversion === undefined ? chord.inversion : modoAdjustedPatch.inversion,
     };
-    if (isExtendedChordName(next.name) && patch.modo === undefined) {
-      next.modo = 'Extendido';
-    }
+    const shouldResetOctavacion = patchIncludesModo && patch.modo === 'Tradicional';
+    const shouldResetApproach = patchIncludesModo && patch.modo === 'Salsa';
+    next.octavacion = shouldResetOctavacion ? state.octavacionDefault : next.octavacion;
+    next.registerOffset = patchIncludesModo ? 0 : next.registerOffset;
+    next.approachNotes = shouldResetApproach
+      ? normaliseApproachNotes(deriveApproachNotes(chord.name))
+      : next.approachNotes;
     return next;
   });
   updateState({ chords });
+  markDirty();
+}
+
+export function resetChordOverrides(): void {
+  const { chords, errors } = buildChords(
+    state.progressionInput,
+    {
+      modoDefault: state.modoDefault,
+      armonizacionDefault: state.armonizacionDefault,
+      octavacionDefault: state.octavacionDefault,
+      chords: [],
+    },
+    { preserveOverrides: false }
+  );
+  updateState({ chords, errors });
   markDirty();
 }
 

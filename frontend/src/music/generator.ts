@@ -11,7 +11,7 @@ const REFERENCE_ROOT = 'backend/reference_midi_loops';
 
 export async function generateMontuno(state: AppState): Promise<GenerationResult> {
   const baseUrl = typeof import.meta.env.BASE_URL === 'string' ? import.meta.env.BASE_URL : '/';
-  const seed = typeof state.seed === 'number' && Number.isFinite(state.seed) ? state.seed : null;
+  const seed = resolveSeed(state.seed);
   const progressionNormalised = applyChordReplacements(normaliseProgressionText(state.progressionInput));
   const resolvedInversions = resolveInversionChain(state.chords, state.inversionDefault);
   const chords = state.chords.map((chord, idx) => ({
@@ -146,4 +146,16 @@ function trimOverlappingNotes(events: NoteEvent[]): NoteEvent[] {
   });
 
   return sanitized.filter((event) => event.duration > 1e-6);
+}
+
+function resolveSeed(seed: number | null): number | null {
+  if (typeof seed === 'number' && Number.isFinite(seed)) {
+    return seed;
+  }
+  if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
+    const buffer = new Uint32Array(1);
+    crypto.getRandomValues(buffer);
+    return Number(buffer[0]);
+  }
+  return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
 }
