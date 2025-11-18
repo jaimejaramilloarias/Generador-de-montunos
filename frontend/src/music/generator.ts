@@ -16,8 +16,6 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
   const resolvedInversions = resolveInversionChain(state.chords, state.inversionDefault);
   const chords = state.chords.map((chord, idx) => ({
     index: chord.index,
-    modo: chord.modo,
-    armonizacion: chord.armonizacion,
     octavacion: chord.octavacion,
     inversion: resolvedInversions[idx]?.inversion ?? chord.inversion ?? null,
     registerOffset: chord.registerOffset,
@@ -37,8 +35,6 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
       {
         progression: progressionNormalised,
         clave: state.clave,
-        modoDefault: state.modoDefault,
-        armonizacionDefault: state.armonizacionDefault,
         variation: state.variation,
         inversionDefault: state.inversionDefault,
         octavacionDefault: state.octavacionDefault,
@@ -54,7 +50,7 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
     console.warn('Fallo al generar el montuno con Pyodide, usando resultado de respaldo.', error);
     raw = {
       ...FALLBACK_RAW_RESULT,
-      modo_tag: `${state.modoDefault} (respaldo)`,
+      modo_tag: 'Salsa (respaldo)',
       clave_tag: `${state.clave} (respaldo)`,
     } satisfies RawGenerationResult;
   }

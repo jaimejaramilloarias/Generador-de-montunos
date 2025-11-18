@@ -1,4 +1,4 @@
-export type Modo = 'Tradicional' | 'Salsa';
+export type Modo = 'Salsa';
 export type Armonizacion = 'Octavas' | 'Doble octava' | 'Décimas' | 'Treceavas';
 export type Octavacion = 'Original' | 'Octava arriba' | 'Octava abajo';
 export type Variacion = 'A' | 'B' | 'C' | 'D';

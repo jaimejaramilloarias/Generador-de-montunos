@@ -8,8 +8,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pretty_midi
 
-from .. import midi_utils, midi_utils_tradicional, salsa
-from ..modos import MODOS_DISPONIBLES
+from .. import midi_utils, salsa
 from ..utils import apply_manual_edits, limpiar_inversion, calc_default_inversions
 
 from .config import ClaveConfig, get_clave_tag
@@ -24,18 +23,6 @@ class MontunoGenerateResult:
     clave_tag: str
     max_eighths: int
     reference_files: List[Path]
-
-
-@dataclass
-class _Segment:
-    mode: str
-    assignments: List[Tuple[str, List[int], str, Optional[str]]]
-    start_eighth: int
-    chord_indices: List[int]
-    octavaciones: List[str]
-
-
-_DEF_VARIATIONS = ["A", "B", "C", "D"]
 
 
 def _normalise_sequence(
@@ -89,10 +76,6 @@ def generate_montuno(
     progression_text: str,
     *,
     clave_config: ClaveConfig,
-    modo_default: str,
-    modo_por_acorde: Optional[Sequence[str]] = None,
-    armonias_por_indice: Optional[Sequence[str]] = None,
-    armonizacion_default: str,
     octavas_por_indice: Optional[Sequence[str]] = None,
     octavacion_default: str = "Original",
     variacion: str,
@@ -126,8 +109,6 @@ def generate_montuno(
             raise ValueError("Progresión vacía")
 
         num_chords = len(asignaciones_all)
-        modos = _normalise_sequence(modo_por_acorde, modo_default, num_chords)
-        armonias = _normalise_sequence(armonias_por_indice, armonizacion_default, num_chords)
         octavaciones = _normalise_sequence(
             octavas_por_indice, octavacion_default, num_chords
         )
@@ -135,13 +116,9 @@ def generate_montuno(
         inversiones = _normalise_optional_sequence(inversiones_por_indice, num_chords)
         aproximaciones = _normalise_nested_notes(aproximaciones_por_indice, num_chords)
 
-        for idx, modo in enumerate(modos):
-            if modo != "Salsa":
-                aproximaciones[idx] = None
-
         inversion_limpia = limpiar_inversion(inversion)
 
-        default_inversions, bass_targets = calc_default_inversions(
+        default_inversions, _ = calc_default_inversions(
             asignaciones_all,
             lambda: inversion_limpia,
             salsa.get_bass_pitch,
@@ -154,140 +131,79 @@ def generate_montuno(
         )
 
         inversiones = [inv or default_inv for inv, default_inv in zip(inversiones, default_inversions)]
-
-        segmentos: List[_Segment] = []
-        start = 0
-        modo_actual = modos[0]
-        for idx in range(1, num_chords):
-            if modos[idx] != modo_actual:
-                segmentos.append(
-                    _Segment(
-                        modo_actual,
-                        _build_segment_assignments(asignaciones_all[start:idx]),
-                        asignaciones_all[start][1][0],
-                        list(range(start, idx)),
-                        octavaciones[start:idx],
-                    )
-                )
-                start = idx
-                modo_actual = modos[idx]
-        segmentos.append(
-            _Segment(
-                modo_actual,
-                _build_segment_assignments(asignaciones_all[start:num_chords]),
-                asignaciones_all[start][1][0],
-                list(range(start, num_chords)),
-                octavaciones[start:num_chords],
-            )
-        )
-
-        modos_unicos = {seg.mode for seg in segmentos}
-        if len(modos_unicos) == 1:
-            unico = next(iter(modos_unicos))
-            modo_tag = unico.lower()
-        else:
-            modo_tag = "mixto"
-
+        modo_tag = "salsa"
         clave_tag = get_clave_tag(clave_config)
 
-        for mod in (midi_utils_tradicional, midi_utils):
-            mod.PRIMER_BLOQUE = list(clave_config.primer_bloque)
-            mod.PATRON_REPETIDO = list(clave_config.patron_repetido)
-            mod.PATRON_GRUPOS = mod.PRIMER_BLOQUE + mod.PATRON_REPETIDO * 3
+        midi_utils.PRIMER_BLOQUE = list(clave_config.primer_bloque)
+        midi_utils.PATRON_REPETIDO = list(clave_config.patron_repetido)
+        midi_utils.PATRON_GRUPOS = midi_utils.PRIMER_BLOQUE + midi_utils.PATRON_REPETIDO * 3
 
         notas_finales: List[pretty_midi.Note] = []
         max_cor = 0
         inst_params: Optional[Tuple[int, bool, str]] = None
         reference_files: List[Path] = []
-        # ``inversion_limpia`` calculated above so the same base inversion is
-        # reused for deterministic default selection.
+        asignaciones_segmento = _build_segment_assignments(asignaciones_all)
 
         with TemporaryDirectory() as tmpdir:
-            for idx, segmento in enumerate(segmentos):
-                funcion = MODOS_DISPONIBLES.get(segmento.mode)
-                if funcion is None:
-                    raise ValueError(f"Modo no soportado: {segmento.mode}")
+            midi_ref_seg = reference_root / f"salsa_{clave_tag}_{inversion_limpia}_{variacion}.mid"
 
-                if segmento.mode == "Salsa":
-                    sufijo_idx = seed or 0
-                    midi_ref_seg = reference_root / (
-                        f"salsa_{clave_tag}_{inversion_limpia}_{_DEF_VARIATIONS[sufijo_idx % 4]}.mid"
-                    )
-                    arg_extra = inversion_limpia
-                else:
-                    midi_ref_seg = reference_root / f"{clave_config.midi_prefix}_{variacion}.mid"
-                    arg_extra = armonizacion_default
+            if not midi_ref_seg.exists():
+                raise FileNotFoundError(f"No se encontró {midi_ref_seg}")
 
-                if not midi_ref_seg.exists():
-                    raise FileNotFoundError(f"No se encontró {midi_ref_seg}")
+            reference_files.append(midi_ref_seg)
+            tmp_path = Path(tmpdir) / "segment_0.mid"
 
-                reference_files.append(midi_ref_seg)
-                tmp_path = Path(tmpdir) / f"segment_{idx}.mid"
+            kwargs: Dict[str, object] = {
+                "asignaciones_custom": asignaciones_segmento,
+                "octavacion_default": octavacion_default,
+                "octavaciones_custom": octavaciones,
+                "register_offsets": register_offsets_norm,
+                "variante": variacion,
+            }
 
-                asign_seg = [tuple(a) for a in segmento.assignments]
-                kwargs = {"asignaciones_custom": asign_seg}
-                inv_seg = [inversiones[i] for i in segmento.chord_indices]
-                bass_seg = [bass_targets[i] for i in segmento.chord_indices]
-                reg_seg = [register_offsets_norm[i] for i in segmento.chord_indices]
-                oct_seg = [octavaciones[i] for i in segmento.chord_indices]
-                kwargs["octavacion_default"] = octavacion_default
-                kwargs["octavaciones_custom"] = oct_seg
-                kwargs["register_offsets"] = reg_seg
+            if any(aproximaciones):
+                kwargs["aproximaciones_por_acorde"] = aproximaciones
+            if any(inversiones):
+                kwargs["inversiones_manual"] = inversiones
 
-                if segmento.mode == "Salsa":
-                    aprox_seg = [aproximaciones[i] for i in segmento.chord_indices]
-                    kwargs["aproximaciones_por_acorde"] = aprox_seg
-                    if any(inv_seg):
-                        kwargs["inversiones_manual"] = inv_seg
-                else:
-                    if any(inv_seg):
-                        suf_map = {"root": "1", "third": "3", "fifth": "5", "seventh": "7"}
-                        asign_mod: List[Tuple[str, List[int], str]] = []
-                        for (nombre, idxs, arm, *_), inv in zip(asign_seg, inv_seg):
-                            if inv and inv != "root":
-                                nombre = f"{nombre}/{suf_map.get(inv, '1')}"
-                            asign_mod.append((nombre, idxs, arm))
-                        asign_seg = asign_mod
-                        kwargs["asignaciones_custom"] = asign_seg
-                    armon_seg = [armonias[i] for i in segmento.chord_indices]
-                    kwargs["armonizaciones_custom"] = armon_seg
-                    kwargs["aleatorio"] = True
-                    kwargs["bajos_objetivo"] = bass_seg
+            salsa.montuno_salsa(
+                "",
+                midi_ref_seg,
+                tmp_path,
+                inversion_limpia,
+                inicio_cor=0,
+                return_pm=False,
+                **kwargs,
+            )
 
-                funcion(
-                    "",
-                    midi_ref_seg,
-                    tmp_path,
-                    arg_extra,
-                    inicio_cor=segmento.start_eighth,
-                    return_pm=False,
-                    **kwargs,
+            pm_segment = pretty_midi.PrettyMIDI(str(tmp_path))
+            if not pm_segment.instruments:
+                return MontunoGenerateResult(
+                    midi=pretty_midi.PrettyMIDI(),
+                    modo_tag=modo_tag,
+                    clave_tag=clave_tag,
+                    max_eighths=0,
+                    reference_files=reference_files,
                 )
 
-                pm_segment = pretty_midi.PrettyMIDI(str(tmp_path))
-                if not pm_segment.instruments:
+            inst = pm_segment.instruments[0]
+            inst_params = (inst.program, inst.is_drum, inst.name)
+
+            grid_seg = 60.0 / bpm / 2
+            seg_cor = int(round(pm_segment.get_end_time() / grid_seg))
+            start = 0.0
+            for note in inst.notes:
+                if note.pitch in (0, 21):
                     continue
-
-                inst = pm_segment.instruments[0]
-                if inst_params is None:
-                    inst_params = (inst.program, inst.is_drum, inst.name)
-
-                grid_seg = 60.0 / bpm / 2
-                seg_cor = int(round(pm_segment.get_end_time() / grid_seg))
-                start = segmento.start_eighth * grid_seg
-                for note in inst.notes:
-                    if note.pitch in (0, 21):
-                        continue
-                    notas_finales.append(
-                        pretty_midi.Note(
-                            velocity=note.velocity,
-                            pitch=note.pitch,
-                            start=note.start + start,
-                            end=note.end + start,
-                        )
+                notas_finales.append(
+                    pretty_midi.Note(
+                        velocity=note.velocity,
+                        pitch=note.pitch,
+                        start=note.start + start,
+                        end=note.end + start,
                     )
-                if segmento.start_eighth + seg_cor > max_cor:
-                    max_cor = segmento.start_eighth + seg_cor
+                )
+            max_cor = max(max_cor, seg_cor)
 
         if inst_params is None:
             raise ValueError("No se generaron notas para la progresión proporcionada")

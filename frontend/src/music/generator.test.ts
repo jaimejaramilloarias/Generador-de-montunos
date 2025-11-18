@@ -1,26 +1,39 @@
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Midi } from '@tonejs/midi';
-import fixtureRaw from './__fixtures__/tradicional.json?raw';
-
-const fixture = JSON.parse(fixtureRaw);
-
-vi.mock('./bridge', () => {
-  const fixture = JSON.parse(fixtureRaw);
-  return {
-    generateMontunoRaw: vi.fn().mockResolvedValue(fixture),
-  };
-});
 
 import { generateMontuno } from './generator';
 import type { AppState } from '../types';
-import { generateMontunoRaw } from './bridge';
+import { FALLBACK_RAW_RESULT } from './fallbackResult';
 import { deriveApproachNotes } from './approachNotes';
+
+const mockedGenerateMontunoRaw = vi.hoisted(() => vi.fn());
+
+vi.mock('./bridge', () => ({
+  generateMontunoRaw: mockedGenerateMontunoRaw,
+}));
+
+function buildFixture() {
+  const midi = new Midi();
+  midi.addTrack().addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 });
+  const buffer = midi.toArray();
+  const base64 = Buffer.from(buffer).toString('base64');
+  return {
+    ...FALLBACK_RAW_RESULT,
+    midi_base64: base64,
+    modo_tag: 'salsa',
+    clave_tag: '2-3',
+    max_eighths: 8,
+    reference_files: ['backend/reference_midi_loops/salsa_2-3_root_A.mid'],
+  };
+}
+
+const fixture = buildFixture();
 
 describe('generateMontuno', () => {
   const baseState: AppState = {
     progressionInput: 'Cmaj7 F7 | G7 Cmaj7',
     clave: 'Clave 2-3',
-    modoDefault: 'Tradicional',
+    modoDefault: 'Salsa',
     armonizacionDefault: 'Octavas',
     octavacionDefault: 'Original',
     variation: 'A',
@@ -32,7 +45,7 @@ describe('generateMontuno', () => {
         index: 0,
         label: 'Cmaj7',
         name: 'Cmaj7',
-        modo: 'Tradicional',
+        modo: 'Salsa',
         armonizacion: 'Octavas',
         octavacion: 'Original',
         inversion: null,
@@ -44,7 +57,7 @@ describe('generateMontuno', () => {
         index: 1,
         label: 'F7',
         name: 'F7',
-        modo: 'Tradicional',
+        modo: 'Salsa',
         armonizacion: 'Octavas',
         octavacion: 'Original',
         inversion: null,
@@ -56,7 +69,7 @@ describe('generateMontuno', () => {
         index: 2,
         label: 'G7',
         name: 'G7',
-        modo: 'Tradicional',
+        modo: 'Salsa',
         armonizacion: 'Octavas',
         octavacion: 'Original',
         inversion: null,
@@ -68,7 +81,7 @@ describe('generateMontuno', () => {
         index: 3,
         label: 'Cmaj7',
         name: 'Cmaj7',
-        modo: 'Tradicional',
+        modo: 'Salsa',
         armonizacion: 'Octavas',
         octavacion: 'Original',
         inversion: null,
@@ -90,13 +103,13 @@ describe('generateMontuno', () => {
   };
 
   beforeEach(() => {
-    (generateMontunoRaw as unknown as Mock).mockResolvedValue(fixture);
+    mockedGenerateMontunoRaw.mockResolvedValue(fixture);
   });
 
   it('produce eventos y metadatos a partir del resultado del backend', async () => {
     const result = await generateMontuno(baseState);
     expect(result.events.length).toBeGreaterThan(0);
-    expect(result.modoTag).toBe('tradicional');
+    expect(result.modoTag).toBe('salsa');
     expect(result.claveTag).toBe('2-3');
     expect(result.maxEighths).toBe(fixture.max_eighths);
     expect(result.referenceFiles).toEqual(fixture.reference_files);
@@ -105,7 +118,7 @@ describe('generateMontuno', () => {
 
   it('utiliza la progresión normalizada al invocar el puente de Python', async () => {
     await generateMontuno(baseState);
-    expect(generateMontunoRaw).toHaveBeenCalledWith(
+    expect(mockedGenerateMontunoRaw).toHaveBeenCalledWith(
       expect.objectContaining({
         progression: 'C∆ F7 | G7 C∆',
         seed: 123,
@@ -121,24 +134,14 @@ describe('generateMontuno', () => {
     expect(Number(result.durationSeconds.toFixed(6))).toBeCloseTo(expectedSeconds, 6);
   });
 
-  it('propaga correctamente los modos tradicionales y de salsa por acorde', async () => {
-    const customState: AppState = {
-      ...baseState,
-      modoDefault: 'Salsa',
-      chords: baseState.chords.map((chord, index) =>
-        index % 2 === 0 ? { ...chord, modo: 'Tradicional' } : { ...chord, modo: 'Salsa' }
-      ),
-    };
+  it('envía solo los campos necesarios para cada acorde', async () => {
+    await generateMontuno(baseState);
 
-    await generateMontuno(customState);
-
-    const [payload] = (generateMontunoRaw as unknown as Mock).mock.calls.at(-1) ?? [];
-    expect(payload.modoDefault).toBe('Salsa');
-    expect(payload.chords).toHaveLength(customState.chords.length);
-    expect(payload.chords.map((chord: AppState['chords'][number]) => chord.modo)).toEqual(
-      customState.chords.map((chord) => chord.modo)
-    );
-    expect(payload.chords.every((chord: AppState['chords'][number]) => typeof chord.inversion === 'string')).toBe(true);
+    const [payload] = mockedGenerateMontunoRaw.mock.calls.at(-1) ?? [];
+    expect(payload.chords).toHaveLength(baseState.chords.length);
+    expect(payload.chords[0]).not.toHaveProperty('modo');
+    expect(payload.chords[0]).not.toHaveProperty('armonizacion');
+    expect(payload.chords.every((chord: any) => typeof chord.registerOffset === 'number')).toBe(true);
   });
 
   it('utiliza una seed aleatoria cuando no se especifica ninguna', async () => {
@@ -158,7 +161,7 @@ describe('generateMontuno', () => {
 
     await generateMontuno(customState);
 
-    const [payload] = (generateMontunoRaw as unknown as Mock).mock.calls.at(-1) ?? [];
+    const [payload] = mockedGenerateMontunoRaw.mock.calls.at(-1) ?? [];
     expect(payload.seed).toBe(4242);
 
     Object.defineProperty(globalThis, 'crypto', { value: originalCrypto, configurable: true, writable: true });
@@ -172,7 +175,7 @@ describe('generateMontuno', () => {
     const buffer = midi.toArray();
     const base64 = Buffer.from(buffer).toString('base64');
 
-    (generateMontunoRaw as unknown as Mock).mockResolvedValueOnce({
+    mockedGenerateMontunoRaw.mockResolvedValueOnce({
       ...fixture,
       midi_base64: base64,
       max_eighths: 8,

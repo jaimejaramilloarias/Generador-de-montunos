@@ -1,10 +1,7 @@
-import { ARMONIZACIONES, MODOS } from '../types/constants';
-import type { Armonizacion, ChordConfig, GenerationResult, Modo, NoteEvent } from '../types';
+import type { ChordConfig, GenerationResult, NoteEvent } from '../types';
 
 interface ViewerActions {
   onBassNudge?: (index: number, direction: 1 | -1) => void;
-  onModeChange?: (index: number, mode: Modo) => void;
-  onArmonizacionChange?: (index: number, armonizacion: Armonizacion) => void;
   onApproachChange?: (index: number, notes: string[]) => void;
   onOctaveShift?: (index: number, delta: 1 | -1) => void;
 }
@@ -228,7 +225,7 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
     if (!lastChords.length) {
       const emptyState = document.createElement('p');
       emptyState.className = 'signal-viewer__chords-empty';
-      emptyState.textContent = 'Agrega una progresión para ajustar la nota grave y el modo de cada acorde.';
+      emptyState.textContent = 'Agrega una progresión para ajustar la nota grave y la octava de cada acorde.';
       chordsPanel.appendChild(emptyState);
       return;
     }
@@ -247,33 +244,15 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
 
       const metaRow = document.createElement('div');
       metaRow.className = 'signal-viewer__chord-meta';
-      const armonizacionTag = chord.modo === 'Tradicional' ? ` · ${chord.armonizacion}` : '';
-      metaRow.textContent = `${chord.modo}${armonizacionTag}`;
+      metaRow.textContent = 'Salsa';
 
       const primaryControls = document.createElement('div');
       primaryControls.className = 'signal-viewer__control-row';
 
-      const modoField = buildSelectField('Modo', MODOS, chord.modo, (value) => {
-        actions.onModeChange?.(chord.index, value as Modo);
+      const approachBox = buildApproachBox(chord.approachNotes, (value) => {
+        actions.onApproachChange?.(chord.index, value);
       });
-      primaryControls.append(modoField.wrapper);
-
-      if (chord.modo === 'Tradicional') {
-        const armonizacionField = buildSelectField(
-          'Armonización',
-          ARMONIZACIONES,
-          chord.armonizacion,
-          (value) => {
-            actions.onArmonizacionChange?.(chord.index, value as Armonizacion);
-          }
-        );
-        primaryControls.append(armonizacionField.wrapper);
-      } else if (chord.modo === 'Salsa') {
-        const approachBox = buildApproachBox(chord.approachNotes, (value) => {
-          actions.onApproachChange?.(chord.index, value);
-        });
-        primaryControls.append(approachBox);
-      }
+      primaryControls.append(approachBox);
 
       const actionsRow = document.createElement('div');
       actionsRow.className = 'signal-viewer__chord-actions';
@@ -312,38 +291,6 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
     button.title = title;
     button.addEventListener('click', onClick);
     return button;
-  }
-
-  function buildSelectField(
-    label: string,
-    options: string[] | { value: string; label: string }[],
-    value: string,
-    onChange: (next: string) => void
-  ): { wrapper: HTMLDivElement; select: HTMLSelectElement } {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'signal-viewer__field';
-
-    const tag = document.createElement('span');
-    tag.className = 'signal-viewer__tag';
-    tag.textContent = label;
-
-    const select = document.createElement('select');
-    select.className = 'signal-viewer__select';
-    const entries =
-      Array.isArray(options) && typeof options[0] === 'string'
-        ? (options as string[]).map((option) => ({ value: option, label: option }))
-        : (options as { value: string; label: string }[]);
-    entries.forEach((option) => {
-      const opt = document.createElement('option');
-      opt.value = option.value;
-      opt.textContent = option.label;
-      select.appendChild(opt);
-    });
-    select.value = value;
-    select.addEventListener('change', (event) => onChange((event.target as HTMLSelectElement).value));
-
-    wrapper.append(tag, select);
-    return { wrapper, select };
   }
 
   function buildApproachBox(

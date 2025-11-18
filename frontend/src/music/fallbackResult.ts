@@ -50,7 +50,7 @@ const MIDI_BASE64 =
 
 export const FALLBACK_RAW_RESULT: RawGenerationResult = {
   midi_base64: MIDI_BASE64.replace(/\n/g, ''),
-  modo_tag: 'Tradicional (fallback)',
+  modo_tag: 'Salsa (fallback)',
   clave_tag: 'Clave 2-3 (fallback)',
   max_eighths: 16,
   reference_files: ['fallback/salsa_2-3_root_A.mid'],

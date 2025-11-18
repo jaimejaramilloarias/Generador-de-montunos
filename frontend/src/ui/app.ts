@@ -4,9 +4,6 @@ import {
   setBpm,
   setChord,
   setClave,
-  setDefaultArmonizacion,
-  setDefaultOctavacion,
-  setDefaultModo,
   shiftAllInversions,
   shiftAllOctaves,
   nudgeChordBass,
@@ -22,7 +19,7 @@ import {
   subscribe,
   resetChordOverrides,
 } from '../state/store';
-import { ARMONIZACIONES, CLAVES, MODOS, OCTAVACIONES } from '../types/constants';
+import { CLAVES } from '../types/constants';
 import type { AppState, GenerationResult, MidiStatus } from '../types';
 import { CHORD_SUFFIX_SUGGESTIONS, getChordSuffixSuggestions } from '../utils/chordAutocomplete';
 import { isExtendedChordName } from '../utils/chords';
@@ -46,10 +43,6 @@ let signalViewer: ReturnType<typeof mountSignalViewer> | null = null;
 interface UiRefs {
   progressionInput: HTMLTextAreaElement;
   claveSelect: HTMLSelectElement;
-  modoSelect: HTMLSelectElement;
-  armonizacionSelect: HTMLSelectElement;
-  armonizacionContainer: HTMLDivElement;
-  octavacionSelect: HTMLSelectElement;
   bpmInput: HTMLInputElement;
   octaveUpBtn: HTMLButtonElement;
   octaveDownBtn: HTMLButtonElement;
@@ -364,12 +357,6 @@ export function setupApp(root: HTMLElement): void {
   const refs = grabRefs(root);
   signalViewer = mountSignalViewer(refs.signalViewer, {
     onBassNudge: nudgeChordBass,
-    onModeChange: (index, modo) => {
-      setChord(index, { modo });
-    },
-    onArmonizacionChange: (index, armonizacion) => {
-      setChord(index, { armonizacion });
-    },
     onApproachChange: (index, notes) => {
       setChord(index, { approachNotes: notes });
     },
@@ -409,36 +396,9 @@ function buildLayout(): string {
                   <select id="clave"></select>
                 </label>
               </div>
-              <div>
-                <label class="input-group">
-                  <span>Modo por defecto</span>
-                  <select id="modo"></select>
-                </label>
-              </div>
-              <div>
-                <div id="armonizacion-default" class="harmonizacion-default">
-                  <label class="input-group">
-                    <span>Armonización por defecto</span>
-                    <select id="armonizacion"></select>
-                  </label>
-                </div>
-              </div>
-              <div>
-                <label class="input-group">
-                  <span>Octavación por defecto</span>
-                  <select id="octavacion"></select>
-                </label>
-              </div>
               <div class="input-group">
                 <label for="bpm">Tempo</label>
                 <input id="bpm" type="number" min="60" max="220" step="1" />
-              </div>
-              <div class="input-group input-group--stacked">
-                <span>Transposición global de octava</span>
-                <div class="transpose-controls" role="group" aria-label="Transponer todas las octavas">
-                  <button type="button" id="octave-down" class="icon-btn icon-btn--pill">−8va</button>
-                  <button type="button" id="octave-up" class="icon-btn icon-btn--pill">+8va</button>
-                </div>
               </div>
             </div>
             <div class="midi-controls midi-controls--compact" aria-label="Conexión MIDI">
@@ -513,6 +473,10 @@ function buildLayout(): string {
                   <button type="button" id="shift-inv-up" class="icon-btn" title="Subir inversiones">⤴</button>
                   <button type="button" id="shift-inv-down" class="icon-btn" title="Bajar inversiones">⤵</button>
                 </div>
+                <div class="icon-btn__group" role="group" aria-label="Transponer todas las octavas">
+                  <button type="button" id="octave-down" class="icon-btn" title="Bajar octava global">−8va</button>
+                  <button type="button" id="octave-up" class="icon-btn" title="Subir octava global">+8va</button>
+                </div>
                 <button
                   type="button"
                   id="reset-overrides"
@@ -540,7 +504,7 @@ function buildLayout(): string {
             <div class="signal-embed__preview signal-embed__preview--full">
               <div id="signal-viewer" class="signal-viewer"></div>
               <p class="signal-embed__hint">
-                Se actualiza automáticamente al regenerar o cambiar parámetros. Ajusta modo, armonización y nota grave por acorde justo debajo del gráfico.
+                Se actualiza automáticamente al regenerar o cambiar parámetros. Ajusta las aproximaciones, la nota grave y la octava por acorde justo debajo del gráfico.
               </p>
             </div>
           </section>
@@ -555,10 +519,6 @@ function grabRefs(root: HTMLElement): UiRefs {
   return {
     progressionInput: root.querySelector<HTMLTextAreaElement>('#progression')!,
     claveSelect: root.querySelector<HTMLSelectElement>('#clave')!,
-    modoSelect: root.querySelector<HTMLSelectElement>('#modo')!,
-    armonizacionSelect: root.querySelector<HTMLSelectElement>('#armonizacion')!,
-    armonizacionContainer: root.querySelector<HTMLDivElement>('#armonizacion-default')!,
-    octavacionSelect: root.querySelector<HTMLSelectElement>('#octavacion')!,
     bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
     octaveUpBtn: root.querySelector<HTMLButtonElement>('#octave-up')!,
     octaveDownBtn: root.querySelector<HTMLButtonElement>('#octave-down')!,
@@ -599,21 +559,6 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
   );
   refs.claveSelect.addEventListener('change', (event) => {
     setClave((event.target as HTMLSelectElement).value);
-  });
-
-  populateSelect(refs.modoSelect, MODOS.map((modo) => ({ value: modo, label: modo })));
-  refs.modoSelect.addEventListener('change', (event) => {
-    setDefaultModo((event.target as HTMLSelectElement).value as AppState['modoDefault']);
-  });
-
-  populateSelect(refs.armonizacionSelect, ARMONIZACIONES.map((item) => ({ value: item, label: item })));
-  refs.armonizacionSelect.addEventListener('change', (event) => {
-    setDefaultArmonizacion((event.target as HTMLSelectElement).value as AppState['armonizacionDefault']);
-  });
-
-  populateSelect(refs.octavacionSelect, OCTAVACIONES.map((item) => ({ value: item, label: item })));
-  refs.octavacionSelect.addEventListener('change', (event) => {
-    setDefaultOctavacion((event.target as HTMLSelectElement).value as AppState['octavacionDefault']);
   });
 
   refs.bpmInput.addEventListener('change', (event) => {
@@ -825,25 +770,9 @@ function updateUi(state: AppState, refs: UiRefs): void {
   if (refs.claveSelect.value !== state.clave) {
     refs.claveSelect.value = state.clave;
   }
-  if (refs.modoSelect.value !== state.modoDefault) {
-    refs.modoSelect.value = state.modoDefault;
-  }
-  if (refs.armonizacionSelect.value !== state.armonizacionDefault) {
-    refs.armonizacionSelect.value = state.armonizacionDefault;
-  }
-  if (refs.octavacionSelect.value !== state.octavacionDefault) {
-    refs.octavacionSelect.value = state.octavacionDefault;
-  }
   if (Number.parseFloat(refs.bpmInput.value) !== state.bpm) {
     refs.bpmInput.value = String(state.bpm);
   }
-
-  const armonizacionEnabled = state.modoDefault === 'Tradicional';
-  refs.armonizacionSelect.disabled = !armonizacionEnabled;
-  refs.armonizacionSelect.title = armonizacionEnabled
-    ? 'Armonización por defecto para modo Tradicional'
-    : 'La armonización solo se habilita cuando el modo por defecto es Tradicional';
-  refs.armonizacionContainer.classList.toggle('is-hidden', !armonizacionEnabled);
 
   renderErrors(state.errors, refs);
   renderSignalArea(state, refs);
