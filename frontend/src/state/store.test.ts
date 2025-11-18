@@ -12,6 +12,7 @@ let setChord: (
   patch: Partial<Pick<AppState['chords'][number], 'modo' | 'armonizacion' | 'octavacion' | 'inversion'>>
 ) => void;
 let recalculateInversions: () => void;
+let resetChordOverrides: () => void;
 
 async function importStore() {
   const store = await import('./store');
@@ -23,6 +24,7 @@ async function importStore() {
   setDefaultModo = store.setDefaultModo;
   setChord = store.setChord;
   recalculateInversions = store.recalculateInversions;
+  resetChordOverrides = store.resetChordOverrides;
 }
 
 describe('state/store saved progressions', () => {
@@ -118,5 +120,20 @@ describe('state/store saved progressions', () => {
 
     const state = getState();
     expect(state.chords[0]?.inversion).toBe('root');
+  });
+
+  it('limpia los overrides manuales y restablece los acordes a los valores por defecto', () => {
+    setProgression('Cmaj7 G7/B');
+    setDefaultModo('Salsa');
+    setChord(0, { modo: 'Tradicional', armonizacion: 'Doble octava', inversion: 'third' });
+    setChord(1, { octavacion: 'Octava arriba', inversion: 'fifth' });
+
+    resetChordOverrides();
+
+    const state = getState();
+    expect(state.chords.every((chord) => chord.modo === state.modoDefault)).toBe(true);
+    expect(state.chords.every((chord) => chord.registerOffset === 0)).toBe(true);
+    expect(state.chords[0]?.inversion).toBeNull();
+    expect(state.chords[1]?.inversion).toBeNull();
   });
 });

@@ -19,6 +19,7 @@ import {
   setProgression,
   subscribe,
   recalculateInversions,
+  resetChordOverrides,
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, MODOS, OCTAVACIONES } from '../types/constants';
 import type { AppState, GenerationResult, MidiStatus } from '../types';
@@ -52,6 +53,7 @@ interface UiRefs {
   inversionShiftUpBtn: HTMLButtonElement;
   inversionShiftDownBtn: HTMLButtonElement;
   recalculateInversionsBtn: HTMLButtonElement;
+  resetOverridesBtn: HTMLButtonElement;
   generateBtn: HTMLButtonElement;
   playBtn: HTMLButtonElement;
   downloadBtn: HTMLButtonElement;
@@ -510,6 +512,15 @@ function buildLayout(): string {
                 >
                   ♻
                 </button>
+                <button
+                  type="button"
+                  id="reset-overrides"
+                  class="icon-btn icon-btn--wide"
+                  title="Eliminar overrides manuales de acordes"
+                  aria-label="Eliminar overrides manuales de acordes"
+                >
+                  ⌫
+                </button>
               </div>
               <div class="signal-embed__cta-group">
                 <a
@@ -551,6 +562,7 @@ function grabRefs(root: HTMLElement): UiRefs {
     inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
     inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
     recalculateInversionsBtn: root.querySelector<HTMLButtonElement>('#recalculate-inversions')!,
+    resetOverridesBtn: root.querySelector<HTMLButtonElement>('#reset-overrides')!,
     generateBtn: root.querySelector<HTMLButtonElement>('#generate')!,
     playBtn: root.querySelector<HTMLButtonElement>('#play')!,
     downloadBtn: root.querySelector<HTMLButtonElement>('#download')!,
@@ -619,6 +631,10 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
 
   refs.recalculateInversionsBtn.addEventListener('click', () => {
     recalculateInversions();
+  });
+
+  refs.resetOverridesBtn.addEventListener('click', () => {
+    resetChordOverrides();
   });
 
   refs.midiEnableBtn.addEventListener('click', async () => {
@@ -722,15 +738,29 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
       return;
     }
 
-    const openSignal = (): void => {
-      window.open(refs.signalOpenLink.href, '_blank', 'noopener,noreferrer');
+    const midiBase64 = btoa(String.fromCharCode(...state.generated.midiData));
+    const signalUrl = new URL(refs.signalOpenLink.href);
+    signalUrl.hash = `midi=${encodeURIComponent(midiBase64)}`;
+
+    const openSignal = (): Window | null => {
+      const win = window.open(signalUrl.toString(), '_blank', 'noopener,noreferrer');
+      if (win) {
+        win.postMessage({ type: 'signal-midi', midiBase64 }, signalUrl.origin);
+      }
+      return win;
     };
 
     try {
       const { generateMidiBlob } = await getMidiExportModule();
       const blob = generateMidiBlob(state.generated);
       if ('clipboard' in navigator && 'write' in navigator.clipboard) {
-        await navigator.clipboard.write([new ClipboardItem({ 'audio/midi': blob })]);
+        const jsonPayload = JSON.stringify({ midiBase64, source: 'montuno-signal' });
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'audio/midi': blob,
+            'text/plain': new Blob([jsonPayload], { type: 'text/plain' }),
+          }),
+        ]);
         refs.signalOpenLink.dataset.tooltip = 'MIDI actualizado listo en Signal';
         window.setTimeout(() => {
           delete refs.signalOpenLink.dataset.tooltip;
@@ -835,6 +865,8 @@ function updateUi(state: AppState, refs: UiRefs): void {
   refs.playBtn.textContent = state.isPlaying ? '⏹' : '▶';
   refs.downloadBtn.disabled = state.isGenerating || !state.generated;
   refs.recalculateInversionsBtn.disabled =
+    state.isGenerating || progressionEmpty || hasBlockingErrors || state.chords.length === 0;
+  refs.resetOverridesBtn.disabled =
     state.isGenerating || progressionEmpty || hasBlockingErrors || state.chords.length === 0;
   refreshChordSuffixHints(refs);
 }

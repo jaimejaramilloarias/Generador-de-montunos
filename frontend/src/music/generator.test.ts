@@ -138,7 +138,12 @@ describe('generateMontuno', () => {
     expect(payload.chords.map((chord: AppState['chords'][number]) => chord.modo)).toEqual(
       customState.chords.map((chord) => chord.modo)
     );
-    expect(payload.chords.every((chord: AppState['chords'][number]) => typeof chord.inversion === 'string')).toBe(true);
+    expect(
+      payload.chords.every(
+        (chord: AppState['chords'][number] & { resolvedInversion: string }) =>
+          typeof chord.resolvedInversion === 'string'
+      )
+    ).toBe(true);
   });
 
   it('respeta overrides individuales aun con modo global tradicional', async () => {
@@ -157,7 +162,12 @@ describe('generateMontuno', () => {
     expect(payload.chords.map((chord: AppState['chords'][number]) => chord.modo)).toEqual(
       customState.chords.map((chord) => chord.modo)
     );
-    expect(payload.chords.every((chord: AppState['chords'][number]) => typeof chord.inversion === 'string')).toBe(true);
+    expect(
+      payload.chords.every(
+        (chord: AppState['chords'][number] & { resolvedInversion: string }) =>
+          typeof chord.resolvedInversion === 'string'
+      )
+    ).toBe(true);
   });
 
   it('recorta notas superpuestas cuando cambian los modos por acorde', async () => {
