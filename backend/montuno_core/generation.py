@@ -99,6 +99,7 @@ def generate_montuno(
     inversion: str,
     reference_root: Path,
     inversiones_por_indice: Optional[Sequence[Optional[str]]] = None,
+    inversiones_usuario: Optional[Sequence[Optional[str]]] = None,
     register_offsets: Optional[Sequence[Optional[int]]] = None,
     aproximaciones_por_indice: Optional[Sequence[Optional[Sequence[str]]]] = None,
     manual_edits: Optional[List[Dict]] = None,
@@ -132,7 +133,8 @@ def generate_montuno(
             octavas_por_indice, octavacion_default, num_chords
         )
         register_offsets_norm = _normalise_int_sequence(register_offsets, 0, num_chords)
-        inversiones = _normalise_optional_sequence(inversiones_por_indice, num_chords)
+        inversiones_calculadas = _normalise_optional_sequence(inversiones_por_indice, num_chords)
+        inversiones_manual = _normalise_optional_sequence(inversiones_usuario, num_chords)
         aproximaciones = _normalise_nested_notes(aproximaciones_por_indice, num_chords)
 
         inversion_limpia = limpiar_inversion(inversion)
@@ -143,13 +145,18 @@ def generate_montuno(
             salsa.get_bass_pitch,
             salsa._ajustar_rango_flexible,
             salsa.seleccionar_inversion,
-            inversiones_por_indice,
+            inversiones_manual,
             offset_getter=lambda idx: salsa._offset_octavacion(octavaciones[idx])
             + register_offsets_norm[idx] * 12,
             return_pitches=True,
         )
 
-        inversiones = [inv or default_inv for inv, default_inv in zip(inversiones, default_inversions)]
+        inversiones = [
+            inv_manual or inv_calc or default_inv
+            for inv_manual, inv_calc, default_inv in zip(
+                inversiones_manual, inversiones_calculadas, default_inversions
+            )
+        ]
 
         segmentos: List[_Segment] = []
         start = 0
@@ -209,7 +216,8 @@ def generate_montuno(
                     midi_ref_seg = reference_root / (
                         f"salsa_{clave_tag}_{inversion_limpia}_{_DEF_VARIATIONS[sufijo_idx % 4]}.mid"
                     )
-                    arg_extra = inversion_limpia
+                    first_idx = segmento.chord_indices[0]
+                    arg_extra = limpiar_inversion(inversiones[first_idx] or inversion_limpia)
                 else:
                     midi_ref_seg = reference_root / f"{clave_config.midi_prefix}_{variacion}.mid"
                     arg_extra = armonizacion_default
@@ -223,6 +231,7 @@ def generate_montuno(
                 asign_seg = [tuple(a) for a in segmento.assignments]
                 kwargs = {"asignaciones_custom": asign_seg}
                 inv_seg = [inversiones[i] for i in segmento.chord_indices]
+                inv_manual_seg = [inversiones_manual[i] for i in segmento.chord_indices]
                 bass_seg = [bass_targets[i] for i in segmento.chord_indices]
                 reg_seg = [register_offsets_norm[i] for i in segmento.chord_indices]
                 oct_seg = [octavaciones[i] for i in segmento.chord_indices]
@@ -233,8 +242,8 @@ def generate_montuno(
                 if segmento.mode == "Salsa":
                     aprox_seg = [aproximaciones[i] for i in segmento.chord_indices]
                     kwargs["aproximaciones_por_acorde"] = aprox_seg
-                    if any(inv_seg):
-                        kwargs["inversiones_manual"] = inv_seg
+                    if any(inv_manual_seg):
+                        kwargs["inversiones_manual"] = inv_manual_seg
                 else:
                     if any(inv_seg):
                         suf_map = {"root": "1", "third": "3", "fifth": "5", "seventh": "7"}

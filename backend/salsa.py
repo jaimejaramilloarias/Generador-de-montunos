@@ -7,6 +7,7 @@ import pretty_midi
 import re
 import statistics
 
+from .utils import limpiar_inversion
 from .voicings import INTERVALOS_TRADICIONALES, parsear_nombre_acorde
 from .midi_utils import (
     _grid_and_bpm,
@@ -712,39 +713,35 @@ def montuno_salsa(
             return offsets_registro[idx] * 12
         return 0
 
-    if inversiones_manual is None:
-        inversiones = []
-        voz_grave_anterior = None
-        bajos_objetivo: Dict[int, int] = {}
-        for idx, (cifrado, _, _, inv_forzado) in enumerate(asignaciones):
-            octava = _offset_octavacion(octavaciones[idx])
-            if idx == 0:
-                inv = inv_forzado or inversion_inicial
+    inversiones: List[str] = []
+    voz_grave_anterior = None
+    bajos_objetivo: Dict[int, int] = {}
+    overrides = list(inversiones_manual or [])
+    for idx, (cifrado, _, _, inv_forzado) in enumerate(asignaciones):
+        octava = _offset_octavacion(octavaciones[idx])
+        inv_override = overrides[idx] if idx < len(overrides) else None
+
+        if inv_override:
+            inv = limpiar_inversion(inv_override)
+            base_pitch = get_bass_pitch(cifrado, inv) + octava + _offset_registro(idx)
+            pitch = _ajustar_rango_flexible(voz_grave_anterior, base_pitch)
+        elif idx == 0:
+            inv = inv_forzado or inversion_inicial
+            base_pitch = get_bass_pitch(cifrado, inv) + octava + _offset_registro(idx)
+            pitch = _ajustar_rango_flexible(voz_grave_anterior, base_pitch)
+        else:
+            if inv_forzado:
+                inv = inv_forzado
                 base_pitch = get_bass_pitch(cifrado, inv) + octava + _offset_registro(idx)
                 pitch = _ajustar_rango_flexible(voz_grave_anterior, base_pitch)
             else:
-                if inv_forzado:
-                    inv = inv_forzado
-                    base_pitch = get_bass_pitch(cifrado, inv) + octava + _offset_registro(idx)
-                    pitch = _ajustar_rango_flexible(voz_grave_anterior, base_pitch)
-                else:
-                    inv, pitch = seleccionar_inversion(
-                        voz_grave_anterior, cifrado, octava + _offset_registro(idx)
-                    )
-            inversiones.append(inv)
-            bajos_objetivo[idx] = pitch
-            voz_grave_anterior = pitch
-    else:
-        inversiones = inversiones_manual
-        bajos_objetivo = {}
-        voz_grave_anterior = None
-        for idx, (cifrado, _, _, _) in enumerate(asignaciones):
-            inv = inversiones[idx]
-            octava = _offset_octavacion(octavaciones[idx])
-            base_pitch = get_bass_pitch(cifrado, inv) + octava + _offset_registro(idx)
-            pitch = base_pitch
-            bajos_objetivo[idx] = pitch
-            voz_grave_anterior = pitch
+                inv, pitch = seleccionar_inversion(
+                    voz_grave_anterior, cifrado, octava + _offset_registro(idx)
+                )
+
+        inversiones.append(inv)
+        bajos_objetivo[idx] = pitch
+        voz_grave_anterior = pitch
 
     # Carga los midis de referencia una única vez por inversión y
     # construye las posiciones repetidas para toda la progresión

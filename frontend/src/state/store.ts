@@ -406,6 +406,25 @@ export function recalculateInversions(): void {
   markDirty();
 }
 
+export function resetChordOverrides(): void {
+  const parsed = parseProgression(state.progressionInput, { armonizacionDefault: state.armonizacionDefault });
+  const chords: ChordConfig[] = parsed.chords.map((chord, index) => ({
+    index,
+    label: chord.raw,
+    name: chord.name,
+    modo: state.modoDefault,
+    armonizacion: chord.armonizacion ?? state.armonizacionDefault,
+    octavacion: state.octavacionDefault,
+    inversion: chord.forcedInversion ?? null,
+    registerOffset: 0,
+    approachNotes: normaliseApproachNotes(deriveApproachNotes(chord.name)),
+    isRecognized: chord.isRecognized,
+  }));
+
+  updateState({ chords, errors: parsed.errors, generated: undefined });
+  markDirty();
+}
+
 export function addManualEdit(): void {
   const next: ManualEditEntry = { type: 'modify', startBeats: 0, durationBeats: 1, pitch: 60 };
   updateState({ manualEdits: [next, ...state.manualEdits] });
