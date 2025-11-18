@@ -20,6 +20,7 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
     armonizacion: chord.armonizacion,
     octavacion: chord.octavacion,
     inversion: resolvedInversions[idx]?.inversion ?? chord.inversion ?? null,
+    registerOffset: chord.registerOffset,
     approachNotes: chord.approachNotes,
   }));
   const secondsPerBeat = 60 / state.bpm;

@@ -94,7 +94,6 @@ def calc_default_inversions(
         if override:
             inv = override
             pitch = get_bass_pitch(cif, inv) + offset
-            pitch = ajustar_rango_flexible(voz, pitch)
         elif idx == 0:
             inv = inv_for or limpiar_inversion(inversion_getter())
             pitch = get_bass_pitch(cif, inv) + offset
@@ -105,7 +104,7 @@ def calc_default_inversions(
                 pitch = get_bass_pitch(cif, inv) + offset
                 pitch = ajustar_rango_flexible(voz, pitch)
             else:
-                inv, pitch = seleccionar_inversion(voz, cif)
+                inv, pitch = seleccionar_inversion(voz, cif, offset)
         invs.append(inv)
         pitches.append(pitch)
         voz = pitch
