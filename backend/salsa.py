@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict, Optional, Set, Iterable
 import pretty_midi
 
 import re
+import statistics
 
 from .voicings import INTERVALOS_TRADICIONALES, parsear_nombre_acorde
 from .midi_utils import (
@@ -382,6 +383,98 @@ def traducir_nota(
     return midi(interval), es_aprox
 
 
+_PC_REGEX = re.compile(r"([A-G][#b]?)(-?\d+)$")
+
+
+def _pc_desde_nombre(nombre_nota: str) -> str:
+    """Extrae la clase de pitch (sin octava) de ``nombre_nota``."""
+
+    m = _PC_REGEX.match(nombre_nota)
+    if m:
+        return m.group(1)
+    return nombre_nota[:-1]
+
+
+def _pc_desde_pitch(pitch: int) -> str:
+    nombre = pretty_midi.note_number_to_name(pitch)
+    return _pc_desde_nombre(nombre)
+
+
+def _octava_desde_pitch(pitch: int) -> int:
+    return pitch // 12 - 1
+
+
+def _pitch_para_pc_y_octava(pc: int, octava: int) -> int:
+    return pc + 12 * (octava + 1)
+
+
+def _ajustar_trio_a_octavas_contiguas(traducciones: List[Dict], key_fn) -> None:
+    """Fuerza tríos simultáneos a mantenerse en octavas contiguas.
+
+    Si en un mismo ``note on`` hay tres notas y al menos dos comparten la
+    misma clase de pitch, se normalizan para que queden como tres octavas
+    consecutivas del mismo nombre. Se preserva el registro original en la
+    medida de lo posible.
+    """
+
+    grupos_por_inicio: Dict[float, List[Dict]] = {}
+    for trad in traducciones:
+        clave = key_fn(trad["pos"]["start"])
+        grupos_por_inicio.setdefault(clave, []).append(trad)
+
+    for grupo in grupos_por_inicio.values():
+        if len(grupo) != 3:
+            continue
+
+        pcs_ref = [_pc_desde_nombre(t["pos"]["name"]) for t in grupo]
+        target_pc_name: Optional[str] = None
+        for pc in set(pcs_ref):
+            if pcs_ref.count(pc) >= 2:
+                target_pc_name = pc
+                break
+
+        if target_pc_name is None:
+            pcs_traducidas = [t["pitch_ajustado"] % 12 for t in grupo]
+            for pc in set(pcs_traducidas):
+                if pcs_traducidas.count(pc) >= 2:
+                    target_pc = pc
+                    break
+            else:
+                continue
+        else:
+            target_pc = pretty_midi.note_name_to_number(f"{target_pc_name}4") % 12
+
+        octavas_actuales = [_octava_desde_pitch(t["pitch_ajustado"]) for t in grupo]
+        mediana = statistics.median(octavas_actuales)
+        inicio_candidatos = range(int(round(mediana)) - 2, int(round(mediana)) + 2)
+
+        mejor_inicio = None
+        mejor_costo = None
+        for inicio in inicio_candidatos:
+            octavas_objetivo = [inicio + i for i in range(3)]
+            costo = sum(
+                abs(o - c) for o, c in zip(sorted(octavas_actuales), octavas_objetivo)
+            )
+            if mejor_costo is None or costo < mejor_costo:
+                mejor_costo = costo
+                mejor_inicio = inicio
+
+        if mejor_inicio is None:
+            continue
+
+        octavas_objetivo = [mejor_inicio + i for i in range(3)]
+        pitches_objetivo = [
+            _pitch_para_pc_y_octava(target_pc, octava) for octava in octavas_objetivo
+        ]
+
+        for trad, pitch_obj in zip(
+            sorted(grupo, key=lambda t: t["pitch_ajustado"]), sorted(pitches_objetivo)
+        ):
+            trad["pitch_base"] = pitch_obj
+            trad["pitch_ajustado"] = pitch_obj
+            trad["pc"] = _pc_desde_pitch(pitch_obj)
+
+
 def _extraer_grupos_con_nombres(
     posiciones_base: List[dict], total_cor_ref: int, grid_seg: float
 ) -> List[List[dict]]:
@@ -754,6 +847,8 @@ def montuno_salsa(
             """Normaliza ``posicion`` para usarla como parte de una clave de agrupación."""
 
             return round(posicion, 6)
+
+        _ajustar_trio_a_octavas_contiguas(traducciones, _key_para_inicio)
 
         for trad in traducciones:
             delta = trad["pitch_ajustado"] - trad["pitch_base"]
