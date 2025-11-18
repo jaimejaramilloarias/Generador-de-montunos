@@ -8,6 +8,25 @@ import { normaliseProgressionText } from '../utils/progression';
 import { resolveInversionChain } from './inversions';
 
 const REFERENCE_ROOT = 'backend/reference_midi_loops';
+const GENERATION_TIMEOUT_MS = 12_000;
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    });
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
 
 export async function generateMontuno(state: AppState): Promise<GenerationResult> {
   const baseUrl = typeof import.meta.env.BASE_URL === 'string' ? import.meta.env.BASE_URL : '/';
@@ -31,20 +50,24 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
 
   let raw: RawGenerationResult;
   try {
-    raw = await generateMontunoRaw(
-      {
-        progression: progressionNormalised,
-        clave: state.clave,
-        variation: state.variation,
-        inversionDefault: state.inversionDefault,
-        octavacionDefault: state.octavacionDefault,
-        bpm: state.bpm,
-        seed,
-        chords,
-        referenceRoot: REFERENCE_ROOT,
-        manualEdits,
-      },
-      baseUrl
+    raw = await withTimeout(
+      generateMontunoRaw(
+        {
+          progression: progressionNormalised,
+          clave: state.clave,
+          variation: state.variation,
+          inversionDefault: state.inversionDefault,
+          octavacionDefault: state.octavacionDefault,
+          bpm: state.bpm,
+          seed,
+          chords,
+          referenceRoot: REFERENCE_ROOT,
+          manualEdits,
+        },
+        baseUrl
+      ),
+      GENERATION_TIMEOUT_MS,
+      'La generación tardó demasiado, usando el resultado de respaldo.'
     );
   } catch (error) {
     console.warn('Fallo al generar el montuno con Pyodide, usando resultado de respaldo.', error);
