@@ -67,6 +67,7 @@ def _montuno_generico(
     octavacion_default: Optional[str] = None,
     octavaciones_custom: Optional[List[str]] = None,
     bajos_objetivo: Optional[List[int]] = None,
+    register_offsets: Optional[List[int]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     if asignaciones_custom is None:
         asignaciones, compases = procesar_progresion_en_grupos(
@@ -85,14 +86,30 @@ def _montuno_generico(
             if idx < len(asignaciones):
                 nombre, idxs = asignaciones[idx][:2]
                 asignaciones[idx] = (nombre, idxs, arm)
+    offsets_registro = register_offsets or []
+
+    def _offset_registro(idx: int) -> int:
+        if 0 <= idx < len(offsets_registro) and offsets_registro[idx] is not None:
+            return offsets_registro[idx] * 12
+        return 0
+
     acordes = [data[0] for data in asignaciones]
     voicings = generar_voicings(acordes)
+
     if bajos_objetivo is not None:
         for idx, (voicing, objetivo) in enumerate(zip(voicings, bajos_objetivo)):
+            offset_registro = _offset_registro(idx)
             if objetivo is None:
+                if offset_registro:
+                    voicings[idx] = [n + offset_registro for n in voicing]
                 continue
-            desplazamiento = objetivo - voicing[0]
+            desplazamiento = objetivo + offset_registro - voicing[0]
             voicings[idx] = [n + desplazamiento for n in voicing]
+    elif register_offsets is not None:
+        for idx, voicing in enumerate(voicings):
+            offset_registro = _offset_registro(idx)
+            if offset_registro:
+                voicings[idx] = [n + offset_registro for n in voicing]
     return exportar_montuno(
         midi_ref,
         voicings,
@@ -125,6 +142,7 @@ def montuno_tradicional(
     octavacion_default: Optional[str] = None,
     octavaciones_custom: Optional[List[str]] = None,
     bajos_objetivo: Optional[List[int]] = None,
+    register_offsets: Optional[List[int]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Generate a montuno in the traditional style."""
 
@@ -144,6 +162,7 @@ def montuno_tradicional(
         octavacion_default=octavacion_default,
         octavaciones_custom=octavaciones_custom,
         bajos_objetivo=bajos_objetivo,
+        register_offsets=register_offsets,
     )
 
 
@@ -161,6 +180,7 @@ def montuno_extendido(
     octavacion_default: Optional[str] = None,
     octavaciones_custom: Optional[List[str]] = None,
     bajos_objetivo: Optional[List[int]] = None,
+    register_offsets: Optional[List[int]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Generate a montuno emphasising extended chord tones."""
 
@@ -180,6 +200,7 @@ def montuno_extendido(
         octavacion_default=octavacion_default,
         octavaciones_custom=octavaciones_custom,
         bajos_objetivo=bajos_objetivo,
+        register_offsets=register_offsets,
     )
 
 
