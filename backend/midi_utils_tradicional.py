@@ -876,10 +876,8 @@ def exportar_montuno(
     )
     inst_out.notes = nuevas_notas
     pm_out.instruments.append(inst_out)
-    if return_pm:
-        return pm_out
-
     pm_out.write(str(output_path))
+    return pm_out if return_pm else None
 
 
 # ==========================================================================
