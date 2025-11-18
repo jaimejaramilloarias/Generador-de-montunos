@@ -1,11 +1,12 @@
-from __future__ import annotations
-
 """Shared MIDI helper utilities used by both modes."""
+
+from __future__ import annotations
 
 from pathlib import Path
 from typing import List
-import random
 import logging
+import random
+
 import pretty_midi
 
 __all__ = [

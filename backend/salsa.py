@@ -9,7 +9,6 @@ import re
 from .voicings import INTERVALOS_TRADICIONALES, parsear_nombre_acorde
 from .midi_utils import (
     _grid_and_bpm,
-    procesar_progresion_en_grupos,
     _cortar_notas_superpuestas,
     _recortar_notas_a_limite,
     _siguiente_grupo,
@@ -596,18 +595,12 @@ def montuno_salsa(
     progresión completa.
     """
     # Procesa la progresión. Cada compás puede contener uno o dos acordes
-    print("[DEBUG] Texto que llega a procesar_progresion_salsa (Salsa):", repr(progresion_texto))
     if asignaciones_custom is None:
-        asignaciones, compases = procesar_progresion_salsa(
+        asignaciones, _ = procesar_progresion_salsa(
             progresion_texto, inicio_cor=inicio_cor
         )
     else:
         asignaciones = asignaciones_custom
-        compases = (
-            (max(i for _, idxs, _, _ in asignaciones for i in idxs) + 7) // 8
-            if asignaciones
-            else 0
-        )
 
     octavaciones = octavaciones_custom or [octavacion_default or "Original"] * len(
         asignaciones
