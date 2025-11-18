@@ -30,7 +30,32 @@ APPROACH_NOTES = {"D", "A", "B", "D#", "F", "G#", "C#"}
 # Switch to enable adjusting approach notes to structural tones when a chord
 # change occurs at the beginning of the pattern.  Set to ``True`` to keep the
 # current behaviour.  When ``False``, approach notes remain unchanged.
-CONVERTIR_APROX_A_ESTRUCT = False
+CONVERTIR_APROX_A_ESTRUCT = True
+
+
+def _normalizar_token_nota(token: str) -> str:
+    token = token.strip()
+    if not token:
+        return ""
+    return token[0].upper() + token[1:]
+
+
+def _preparar_aproximaciones(
+    aproximaciones_por_acorde: Optional[List[Optional[List[str]]]], total: int
+) -> List[Set[str]]:
+    aproximaciones: List[Set[str]] = []
+    for idx in range(total):
+        raw = aproximaciones_por_acorde[idx] if aproximaciones_por_acorde and idx < len(aproximaciones_por_acorde) else None
+        if raw is None:
+            aproximaciones.append(set(APPROACH_NOTES))
+            continue
+        normalizadas: Set[str] = set()
+        for token in raw:
+            norm = _normalizar_token_nota(token)
+            if norm:
+                normalizadas.add(norm)
+        aproximaciones.append(normalizadas or set(APPROACH_NOTES))
+    return aproximaciones
 
 
 def _pitch_classes_en_acorde(cifrado: str) -> Set[int]:
@@ -210,7 +235,9 @@ def seleccionar_inversion(
 # ========================
 
 
-def traducir_nota(note_name: str, cifrado: str) -> Tuple[int, bool]:
+def traducir_nota(
+    note_name: str, cifrado: str, aproximaciones: Optional[Set[str]] = None
+) -> Tuple[int, bool]:
     """Traduce ``note_name`` según las reglas del modo salsa.
 
     Devuelve el ``pitch`` calculado y un flag indicando si la nota es de
@@ -227,6 +254,8 @@ def traducir_nota(note_name: str, cifrado: str) -> Tuple[int, bool]:
     extra_b6 = "(b6)" in cifrado
     extra_b13 = "(b13)" in cifrado
 
+    approx = set(APPROACH_NOTES) if aproximaciones is None else set(aproximaciones)
+
     name = note_name[:-1]
     octave = int(note_name[-1])
 
@@ -234,7 +263,7 @@ def traducir_nota(note_name: str, cifrado: str) -> Tuple[int, bool]:
         return root + interval + 12 * (octave + 1)
 
     interval = None
-    es_aprox = False
+    es_aprox = name in approx
 
     if name == "C":
         interval = 0
@@ -247,34 +276,34 @@ def traducir_nota(note_name: str, cifrado: str) -> Tuple[int, bool]:
             interval = 1
         else:
             interval = 1 if has_b9 else 2
-        es_aprox = True
+        es_aprox = es_aprox or name in approx
     elif name == "A":
         if has_b9 or has_b13 or has_b5 or extra_b6 or extra_b13:
             interval = 8
         else:
             interval = 9
-        es_aprox = True
+        es_aprox = es_aprox or name in approx
     elif name == "B":
         if suf.endswith("6") and "7" not in suf:
             interval = 11
         else:
             interval = ints[3] if len(ints) > 3 else 11
-        es_aprox = True
+        es_aprox = es_aprox or name in approx
     elif name == "D#":
         third_int = 3 if is_minor else 4
         interval = third_int - 1
-        es_aprox = True
+        es_aprox = es_aprox or name in approx
     elif name == "F":
         interval = 5
-        es_aprox = True
+        es_aprox = es_aprox or name in approx
     elif name == "G#":
         interval = ints[2] - 1
-        es_aprox = True
+        es_aprox = es_aprox or name in approx
     elif name == "C#":
         interval = 11 if has_b9 else 1
-        es_aprox = True
+        es_aprox = es_aprox or name in approx
     else:
-        return pretty_midi.note_name_to_number(note_name), False
+        return pretty_midi.note_name_to_number(note_name), name in approx
 
     return midi(interval), es_aprox
 
@@ -476,6 +505,7 @@ def montuno_salsa(
     asignaciones_custom: Optional[List[Tuple[str, List[int], str, Optional[str]]]] = None,
     octavacion_default: Optional[str] = None,
     octavaciones_custom: Optional[List[str]] = None,
+    aproximaciones_por_acorde: Optional[List[Optional[List[str]]]] = None,
 ) -> Optional[pretty_midi.PrettyMIDI]:
     """Genera montuno estilo salsa enlazando acordes e inversiones.
 
@@ -501,6 +531,7 @@ def montuno_salsa(
     octavaciones = octavaciones_custom or [octavacion_default or "Original"] * len(
         asignaciones
     )
+    aproximaciones = _preparar_aproximaciones(aproximaciones_por_acorde, len(asignaciones))
 
     # --------------------------------------------------------------
     # Selección de la inversión para cada acorde enlazando la voz grave
@@ -591,7 +622,7 @@ def montuno_salsa(
         base_min: Optional[int] = None
         for grupo in grupos_por_inv[inv]:
             for pos in grupo:
-                pitch, _ = traducir_nota(pos["name"], acorde)
+                pitch, _ = traducir_nota(pos["name"], acorde, aproximaciones[idx])
                 if base_min is None or pitch < base_min:
                     base_min = pitch
         mas_grave_por_acorde[idx] = base_min if base_min is not None else 0
@@ -622,7 +653,7 @@ def montuno_salsa(
         prev_classes = clases_por_acorde.get(idx_acorde - 1)
         next_classes = clases_por_acorde.get(idx_acorde + 1)
         for pos in grupos_act[inv][ref_idx]:
-            pitch, es_aprox = traducir_nota(pos["name"], acorde)
+            pitch, es_aprox = traducir_nota(pos["name"], acorde, aproximaciones[idx_acorde])
             comienzo = asignaciones[idx_acorde][1][0]
             if CONVERTIR_APROX_A_ESTRUCT and es_aprox and cor == comienzo:
                 pitch = _ajustar_a_estructural_mas_cercano(

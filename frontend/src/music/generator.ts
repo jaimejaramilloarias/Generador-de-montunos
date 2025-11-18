@@ -20,6 +20,10 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
     armonizacion: chord.armonizacion,
     octavacion: chord.octavacion,
     inversion: resolvedInversions[idx]?.inversion ?? chord.inversion ?? null,
+    approachNotes: chord.approachNotes
+      .split(',')
+      .map((token) => token.trim())
+      .filter(Boolean),
   }));
   const secondsPerBeat = 60 / state.bpm;
   const manualEdits = (state.manualEdits ?? []).map((edit) => ({

@@ -377,6 +377,9 @@ export function setupApp(root: HTMLElement): void {
     onArmonizacionChange: (index, armonizacion) => {
       setChord(index, { armonizacion });
     },
+    onApproachChange: (index, notes) => {
+      setChord(index, { approachNotes: notes });
+    },
   });
   bindStaticEvents(refs, root);
   subscribe((state) => {
@@ -398,75 +401,6 @@ function buildLayout(): string {
         <h1>Generador de Montunos</h1>
         <p>Desarrollado por Jaime Jaramillo Arias.</p>
       </header>
-      <section class="app__signal" aria-label="Editor MIDI Signal">
-        <section class="signal-embed">
-          <div class="signal-embed__header">
-            <div>
-              <h3>Editor MIDI Signal integrado</h3>
-              <p>Visualiza al instante el montuno generado, ajusta cada acorde y mándalo a Signal con un solo clic.</p>
-            </div>
-            <div class="signal-embed__toolbar" aria-label="Reproducción y controles avanzados">
-              <button
-                type="button"
-                id="generate"
-                class="icon-btn"
-                title="Generar montuno"
-                aria-label="Generar montuno"
-              >
-                ⟳
-              </button>
-              <button
-                type="button"
-                id="play"
-                class="icon-btn"
-                title="Reproducir o detener"
-                aria-label="Reproducir o detener"
-              >
-                ⏯
-              </button>
-              <button
-                type="button"
-                id="download"
-                class="icon-btn"
-                title="Descargar MIDI"
-                aria-label="Descargar MIDI"
-                disabled
-              >
-                ⬇
-              </button>
-              <div class="icon-btn__group" role="group" aria-label="Desplazar inversiones">
-                <button type="button" id="shift-inv-up" class="icon-btn" title="Subir inversiones">⤴</button>
-                <button type="button" id="shift-inv-down" class="icon-btn" title="Bajar inversiones">⤵</button>
-              </div>
-              <button
-                type="button"
-                id="recalculate-inversions"
-                class="icon-btn icon-btn--wide"
-                title="Recalcular inversiones para corregir enlaces extraños"
-              >
-                Recalcular inversiones
-              </button>
-            </div>
-            <div class="signal-embed__cta-group">
-              <a
-                id="signal-open"
-                class="btn signal-embed__cta"
-                href="https://signalmidi.app/edit"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Abrir Signal
-              </a>
-            </div>
-          </div>
-          <div class="signal-embed__preview signal-embed__preview--full">
-            <div id="signal-viewer" class="signal-viewer"></div>
-            <p class="signal-embed__hint">
-              Se actualiza automáticamente al regenerar o cambiar parámetros. Ajusta modo, armonización y nota grave por acorde justo debajo del gráfico.
-            </p>
-          </div>
-        </section>
-      </section>
       <section class="app__body">
         <form class="panel" id="montuno-form">
           <fieldset class="panel__section">
@@ -554,6 +488,76 @@ function buildLayout(): string {
           </div>
         </aside>
       </section>
+      <section class="app__signal" aria-label="Editor MIDI Signal">
+        <section class="signal-embed">
+          <div class="signal-embed__header">
+            <div>
+              <h3>Editor MIDI Signal integrado</h3>
+              <p>Visualiza al instante el montuno generado, ajusta cada acorde y mándalo a Signal con un solo clic.</p>
+            </div>
+            <div class="signal-embed__toolbar" aria-label="Reproducción y controles avanzados">
+              <button
+                type="button"
+                id="generate"
+                class="icon-btn"
+                title="Generar montuno"
+                aria-label="Generar montuno"
+              >
+                ⟳
+              </button>
+              <button
+                type="button"
+                id="play"
+                class="icon-btn"
+                title="Reproducir o detener"
+                aria-label="Reproducir o detener"
+              >
+                ⏯
+              </button>
+              <button
+                type="button"
+                id="download"
+                class="icon-btn"
+                title="Descargar MIDI"
+                aria-label="Descargar MIDI"
+                disabled
+              >
+                ⬇
+              </button>
+              <div class="icon-btn__group" role="group" aria-label="Desplazar inversiones">
+                <button type="button" id="shift-inv-up" class="icon-btn" title="Subir inversiones">⤴</button>
+                <button type="button" id="shift-inv-down" class="icon-btn" title="Bajar inversiones">⤵</button>
+              </div>
+              <button
+                type="button"
+                id="recalculate-inversions"
+                class="icon-btn icon-btn--wide"
+                title="Recalcular inversiones para corregir enlaces extraños"
+              >
+                Recalcular inversiones
+              </button>
+            </div>
+            <div class="signal-embed__cta-group">
+              <a
+                id="signal-open"
+                class="btn signal-embed__cta"
+                href="https://signalmidi.app/edit"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Abrir Signal
+              </a>
+            </div>
+          </div>
+          <div class="signal-embed__preview signal-embed__preview--full">
+            <div id="signal-viewer" class="signal-viewer"></div>
+            <p class="signal-embed__hint">
+              Se actualiza automáticamente al regenerar o cambiar parámetros. Ajusta modo, armonización y nota grave por acorde justo debajo del gráfico.
+            </p>
+          </div>
+        </section>
+      </section>
+
     </main>
   `;
 }
