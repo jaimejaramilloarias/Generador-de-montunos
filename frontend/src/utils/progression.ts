@@ -149,7 +149,7 @@ export function parseProgression(
       return;
     }
 
-    segmentChords.forEach(({ raw, chord, armonizacion, inversion }) => {
+    segmentChords.forEach(({ raw, chord, armonizacion, inversion, approachNotes }) => {
       const match = chord.match(chordRegex);
       if (!match) {
         errors.push(`Token no reconocido en la posición ${chords.length + 1}: “${raw}”`);
@@ -168,7 +168,7 @@ export function parseProgression(
         raw,
         index: chords.length,
         isRecognized: recognized,
-        approachNotes: chord.approachNotes ?? [...DEFAULT_APPROACH_NOTES],
+        approachNotes: approachNotes ?? [...DEFAULT_APPROACH_NOTES],
         ...(armonizacion ? { armonizacion } : {}),
         ...(inversion ? { forcedInversion: inversion } : {}),
       });
