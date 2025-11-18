@@ -121,21 +121,19 @@ describe('generateMontuno', () => {
     expect(Number(result.durationSeconds.toFixed(6))).toBeCloseTo(expectedSeconds, 6);
   });
 
-  it('propaga correctamente los modos extendidos y por acorde', async () => {
+  it('propaga correctamente los modos por acorde', async () => {
     const customState: AppState = {
       ...baseState,
-      modoDefault: 'Extendido',
+      modoDefault: 'Salsa',
       chords: baseState.chords.map((chord, index) =>
-        index % 2 === 0
-          ? { ...chord, modo: 'Extendido' }
-          : { ...chord, modo: 'Tradicional' }
+        index % 2 === 0 ? { ...chord, modo: 'Salsa' } : { ...chord, modo: 'Tradicional' }
       ),
     };
 
     await generateMontuno(customState);
 
     const [payload] = (generateMontunoRaw as unknown as Mock).mock.calls.at(-1) ?? [];
-    expect(payload.modoDefault).toBe('Extendido');
+    expect(payload.modoDefault).toBe('Salsa');
     expect(payload.chords).toHaveLength(customState.chords.length);
     expect(payload.chords.map((chord: AppState['chords'][number]) => chord.modo)).toEqual(
       customState.chords.map((chord) => chord.modo)
@@ -143,12 +141,12 @@ describe('generateMontuno', () => {
     expect(payload.chords.every((chord: AppState['chords'][number]) => typeof chord.inversion === 'string')).toBe(true);
   });
 
-  it('mantiene disponible el modo extendido como override por acorde con modo global tradicional', async () => {
+  it('respeta overrides individuales aun con modo global tradicional', async () => {
     const customState: AppState = {
       ...baseState,
       modoDefault: 'Tradicional',
       chords: baseState.chords.map((chord, index) =>
-        index === 1 ? { ...chord, modo: 'Extendido' } : chord
+        index === 1 ? { ...chord, modo: 'Salsa' } : chord
       ),
     };
 

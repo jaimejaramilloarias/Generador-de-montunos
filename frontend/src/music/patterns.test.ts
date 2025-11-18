@@ -2,14 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { getPattern } from './patterns';
 
 describe('patterns', () => {
-  it('comparte el patrón tradicional con el modo extendido sin mutar el original', () => {
+  it('devuelve copias independientes del patrón solicitado', () => {
     const trad = getPattern('Tradicional', 'A');
-    const extendido = getPattern('Extendido', 'A');
+    const tradCopy = getPattern('Tradicional', 'A');
+    const salsa = getPattern('Salsa', 'A');
 
-    expect(extendido).toEqual(trad);
-    expect(extendido).not.toBe(trad);
+    expect(trad).not.toBe(tradCopy);
+    expect(trad[0]!.roles).not.toEqual([]);
+    trad[0]!.roles.push('extra');
 
-    extendido[0]!.roles.push('extra');
-    expect(trad[0]!.roles).not.toContain('extra');
+    expect(tradCopy[0]!.roles).not.toContain('extra');
+    expect(salsa).not.toBe(trad);
   });
 });
