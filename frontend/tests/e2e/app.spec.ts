@@ -14,7 +14,8 @@ test.describe('Generador de Montunos - flujo principal', () => {
 
     await page.getByRole('button', { name: 'Generar montuno' }).click();
 
-    await expect(page.locator('#summary-content')).toContainText('Compases');
+    const meta = page.locator('.signal-viewer__meta');
+    await expect(meta).toContainText('compases', { timeout: 15000 });
 
     const chordCards = page.locator('.signal-viewer__chord');
     await expect(chordCards).toHaveCount(4, { timeout: 15000 });
