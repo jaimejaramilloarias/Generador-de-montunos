@@ -231,18 +231,20 @@ def _ajustar_aproximaciones_por_contexto(
                 continue
 
             letra = nota[0].upper()
-            mejor_pc = pc_original
-            mejor_dist = None
-            for candidato in vecinos:
-                if not _is_pc_for_letter(letra, candidato):
-                    continue
-                dist = _pc_distance(pc_original, candidato)
-                if mejor_dist is None or dist < mejor_dist:
-                    mejor_dist = dist
-                    mejor_pc = candidato
+            candidatos = [pc for pc in vecinos if _pc_distance(pc_original, pc) == 1]
+            if not candidatos:
+                ajustadas.append(nota)
+                continue
 
-            if mejor_dist is not None and mejor_pc != pc_original:
-                ajustadas.append(_note_name_for_letter(letra, mejor_pc))
+            preferidos = [pc for pc in candidatos if _is_pc_for_letter(letra, pc, max_distance=1)]
+            objetivo = (sorted(preferidos) or sorted(candidatos))[0]
+
+            if objetivo != pc_original:
+                if preferidos:
+                    ajustadas.append(_note_name_for_letter(letra, objetivo))
+                else:
+                    usar_bemoles = "b" in nota and "#" not in nota
+                    ajustadas.append(_pc_to_note(objetivo, usar_bemoles))
             else:
                 ajustadas.append(nota)
 
