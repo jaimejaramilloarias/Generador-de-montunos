@@ -5,7 +5,7 @@ interface ViewerActions {
   onBassNudge?: (index: number, direction: 1 | -1) => void;
   onModeChange?: (index: number, mode: Modo) => void;
   onArmonizacionChange?: (index: number, armonizacion: Armonizacion) => void;
-  onApproachChange?: (index: number, notes: string) => void;
+  onApproachChange?: (index: number, notes: string[]) => void;
 }
 
 interface ViewerState {
@@ -268,10 +268,10 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
         );
         primaryControls.append(armonizacionField.wrapper);
       } else if (chord.modo === 'Salsa') {
-        const approachField = buildTextField('Aproximaciones', chord.approachNotes, (value) => {
+        const approachBox = buildApproachBox(chord.approachNotes, (value) => {
           actions.onApproachChange?.(chord.index, value);
         });
-        primaryControls.append(approachField.wrapper);
+        primaryControls.append(approachBox);
       }
 
       const actionsRow = document.createElement('div');
@@ -334,6 +334,54 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
 
     wrapper.append(tag, select);
     return { wrapper, select };
+  }
+
+  function buildApproachBox(
+    values: string[],
+    onChange: (next: string[]) => void
+  ): HTMLDivElement {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'signal-viewer__field signal-viewer__field--stretch signal-viewer__field--approach';
+
+    const tag = document.createElement('span');
+    tag.className = 'signal-viewer__tag';
+    tag.textContent = 'Aproximaciones';
+
+    const grid = document.createElement('div');
+    grid.className = 'signal-viewer__approach-grid';
+
+    const labels = ['2ª', '4ª', '6ª', '7ª'];
+    const current = values.slice(0, 4);
+    while (current.length < 4) {
+      current.push('');
+    }
+
+    labels.forEach((label, index) => {
+      const item = document.createElement('label');
+      item.className = 'signal-viewer__approach-item';
+
+      const smallTag = document.createElement('span');
+      smallTag.className = 'signal-viewer__tag signal-viewer__tag--sub';
+      smallTag.textContent = label;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'signal-viewer__input signal-viewer__input--compact';
+      input.placeholder = label;
+      input.value = current[index] ?? '';
+      input.addEventListener('input', (event) => {
+        const next = current.slice();
+        next[index] = (event.target as HTMLInputElement).value;
+        onChange(next);
+        current[index] = next[index];
+      });
+
+      item.append(smallTag, input);
+      grid.appendChild(item);
+    });
+
+    wrapper.append(tag, grid);
+    return wrapper;
   }
 
   function buildTextField(

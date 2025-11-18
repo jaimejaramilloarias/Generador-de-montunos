@@ -34,12 +34,14 @@ function createId(): string {
   return `prog-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 }
 
-function normaliseApproachNotes(input: string): string {
-  return input
-    .split(',')
-    .map((token) => token.trim())
-    .filter(Boolean)
-    .join(', ');
+function normaliseApproachNotes(input: string | string[]): string[] {
+  const tokens = Array.isArray(input) ? input : input.split(',');
+  const cleaned = tokens.map((token) => token.trim()).filter(Boolean);
+  const padded = cleaned.slice(0, 4);
+  while (padded.length < 4) {
+    padded.push(cleaned[padded.length] ?? '');
+  }
+  return padded;
 }
 
 function normaliseSavedProgressions(list?: SavedProgression[]): SavedProgression[] {
