@@ -612,13 +612,38 @@ def montuno_salsa(
         ajuste = ajuste_por_acorde.get(idx_acorde, 0)
         grupos_act = grupos_por_inv
         ref_idx = (inicio_cor + cor + offset_ref) % total_ref_cor
+        traducciones = []
+        comienzo = asignaciones[idx_acorde][1][0]
         for pos in grupos_act[inv][ref_idx]:
-            pitch, es_aprox = traducir_nota(pos["name"], acorde, aproximaciones[idx_acorde])
-            comienzo = asignaciones[idx_acorde][1][0]
+            pitch_base, es_aprox = traducir_nota(
+                pos["name"], acorde, aproximaciones[idx_acorde]
+            )
+            pitch_ajustado = pitch_base
             if CONVERTIR_APROX_A_ESTRUCT and es_aprox and cor == comienzo:
-                pitch = _ajustar_a_estructural_mas_cercano(
-                    pos["name"], cifrado=acorde, pitch=pitch
+                pitch_ajustado = _ajustar_a_estructural_mas_cercano(
+                    pos["name"], cifrado=acorde, pitch=pitch_base
                 )
+            traducciones.append(
+                {
+                    "pos": pos,
+                    "pitch_base": pitch_base,
+                    "pitch_ajustado": pitch_ajustado,
+                    "pc": pos["name"][:-1],
+                }
+            )
+
+        deltas_por_pc: Dict[str, int] = {}
+        for trad in traducciones:
+            delta = trad["pitch_ajustado"] - trad["pitch_base"]
+            pc = trad["pc"]
+            if pc not in deltas_por_pc or (deltas_por_pc[pc] == 0 and delta != 0):
+                deltas_por_pc[pc] = delta
+
+        for trad in traducciones:
+            pos = trad["pos"]
+            delta = deltas_por_pc.get(trad["pc"], 0)
+            pitch = trad["pitch_base"] + delta
+
             inicio = cor * grid + pos["start"]
             fin = cor * grid + pos["end"]
             fin_limite = limites[idx_acorde] * grid
