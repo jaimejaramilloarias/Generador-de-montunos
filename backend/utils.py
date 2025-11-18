@@ -1,12 +1,12 @@
-from __future__ import annotations
-
 """Miscellaneous helper functions used across the GUI."""
 
+from __future__ import annotations
+
+from pathlib import Path
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple, Union
 import json
 import re
-from pathlib import Path
-import re
+
 import pretty_midi
 
 __all__ = [

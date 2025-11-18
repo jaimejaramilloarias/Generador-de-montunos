@@ -3,10 +3,8 @@
 
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-import math
-import pretty_midi
-import random
 import logging
+import pretty_midi
 from .voicings_tradicional import parsear_nombre_acorde, INTERVALOS_TRADICIONALES
 from .midi_common import (
     NOTAS_BASE,
@@ -240,9 +238,6 @@ def _arm_decimas_intervalos(
         )
 
     contadores: Dict[int, int] = {}
-    offsets: Dict[int, int] = {}
-    bajo_anterior: Optional[int] = None
-    arm_anterior: Optional[str] = None
     resultado: List[pretty_midi.Note] = []
 
     for pos in posiciones:
@@ -396,9 +391,6 @@ def _arm_treceavas_intervalos(
         )
 
     contadores: Dict[int, int] = {}
-    offsets: Dict[int, int] = {}
-    bajo_anterior: Optional[int] = None
-    arm_anterior: Optional[str] = None
     resultado: List[pretty_midi.Note] = []
 
     for pos in posiciones:
