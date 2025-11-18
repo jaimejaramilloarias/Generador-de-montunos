@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Redirigiendo…</title>
+    <meta http-equiv="refresh" content="0; url=/" />
+    <script>
+      (function redirectToRoot() {
+        const { pathname, origin } = window.location;
+        const docsIndex = pathname.lastIndexOf('/docs/');
+        const basePath = docsIndex !== -1 ? pathname.slice(0, docsIndex + 1) : '/';
+        const target = `${origin}${basePath}`;
+        window.location.replace(target);
+      })();
+    </script>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.5;
+        margin: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Redirigiendo a la página principal…</p>
+    <p><a href="/">Ir al inicio</a></p>
+  </body>
+</html>
