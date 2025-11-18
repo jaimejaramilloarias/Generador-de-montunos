@@ -17,6 +17,7 @@ function pickInterval(templateNote: string, intervals: number[], suffix: string)
   const isMinor =
     third - (intervals[0] ?? 0) === 3 || /m7\(b5\)|(^|[^a-z])m(?!aj)/.test(lowered) || /º|°/.test(lowered);
   const hasB9 = suffix.includes('b9');
+  const hasSharp9 = /#9|\+9/.test(suffix);
   const hasB13 = suffix.includes('b13');
   const hasB5 = suffix.includes('b5');
   const extraB6 = suffix.includes('(b6)');
@@ -30,7 +31,9 @@ function pickInterval(templateNote: string, intervals: number[], suffix: string)
     case 'G':
       return fifth;
     case 'D':
-      return hasB5 ? 1 : hasB9 ? 1 : 2;
+      if (hasB5 || hasB9) return 1;
+      if (hasSharp9) return 3;
+      return 2;
     case 'A':
       return hasB9 || hasB13 || hasB5 || extraB6 || extraB13 ? 8 : 9;
     case 'B':
@@ -44,7 +47,9 @@ function pickInterval(templateNote: string, intervals: number[], suffix: string)
     case 'G#':
       return fifth - 1;
     case 'C#':
-      return hasB9 ? 11 : 1;
+      if (hasB9) return 11;
+      if (hasSharp9) return 3;
+      return null;
     default:
       return null;
   }
@@ -56,13 +61,22 @@ export function deriveApproachNotes(chordName: string): string {
   const suffix = chordName.slice(rootSymbol.length).toLowerCase();
   const intervals = detectIntervals(chordName);
 
-  const translated = DEFAULT_SALSA_APPROACH_NOTES.map((note) => {
-    const result = pickInterval(note, intervals, suffix);
-    if (result === null) {
-      return note;
-    }
-    return intervalToNote(rootPc, result);
-  });
+  const hasFlatNine = suffix.includes('b9');
+  const hasSharpNine = /#9|\+9/.test(suffix);
+  const templateNotes =
+    hasFlatNine || hasSharpNine
+      ? DEFAULT_SALSA_APPROACH_NOTES
+      : DEFAULT_SALSA_APPROACH_NOTES.filter((note) => note !== 'C#');
+
+  const translated = templateNotes
+    .map((note) => {
+      const result = pickInterval(note, intervals, suffix);
+      if (result === null) {
+        return note;
+      }
+      return intervalToNote(rootPc, result);
+    })
+    .filter((value, index, list) => list.indexOf(value) === index);
 
   return translated.join(', ');
 }
