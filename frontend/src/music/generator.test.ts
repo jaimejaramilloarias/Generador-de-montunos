@@ -14,6 +14,7 @@ vi.mock('./bridge', () => {
 import { generateMontuno } from './generator';
 import type { AppState } from '../types';
 import { generateMontunoRaw } from './bridge';
+import { deriveApproachNotes } from './approachNotes';
 
 describe('generateMontuno', () => {
   const baseState: AppState = {
@@ -36,7 +37,7 @@ describe('generateMontuno', () => {
         octavacion: 'Original',
         inversion: null,
         registerOffset: 0,
-        approachNotes: 'D, A, B, D#, F, G#, C#',
+        approachNotes: deriveApproachNotes('Cmaj7'),
         isRecognized: true,
       },
       {
@@ -48,7 +49,7 @@ describe('generateMontuno', () => {
         octavacion: 'Original',
         inversion: null,
         registerOffset: 0,
-        approachNotes: 'D, A, B, D#, F, G#, C#',
+        approachNotes: deriveApproachNotes('F7'),
         isRecognized: true,
       },
       {
@@ -60,7 +61,7 @@ describe('generateMontuno', () => {
         octavacion: 'Original',
         inversion: null,
         registerOffset: 0,
-        approachNotes: 'D, A, B, D#, F, G#, C#',
+        approachNotes: deriveApproachNotes('G7'),
         isRecognized: true,
       },
       {
@@ -72,7 +73,7 @@ describe('generateMontuno', () => {
         octavacion: 'Original',
         inversion: null,
         registerOffset: 0,
-        approachNotes: 'D, A, B, D#, F, G#, C#',
+        approachNotes: deriveApproachNotes('Cmaj7'),
         isRecognized: true,
       },
     ],

@@ -7,6 +7,7 @@ import {
   resolveInversionChain,
   stepInversionPitch,
 } from './inversions';
+import { deriveApproachNotes } from './approachNotes';
 
 function buildChord(index: number, name: string, inversion: ChordConfig['inversion'] = null): ChordConfig {
   return {
@@ -18,7 +19,7 @@ function buildChord(index: number, name: string, inversion: ChordConfig['inversi
     inversion,
     registerOffset: 0,
     modo: 'Tradicional',
-    approachNotes: 'D, A, B, D#, F, G#, C#',
+    approachNotes: deriveApproachNotes(name),
     isRecognized: true,
   } satisfies ChordConfig;
 }
