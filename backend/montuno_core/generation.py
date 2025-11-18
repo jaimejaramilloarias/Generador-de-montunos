@@ -103,7 +103,9 @@ def generate_montuno(
         random.seed(seed)
 
     try:
-        asignaciones_all, _ = salsa.procesar_progresion_salsa(progression_text)
+        asignaciones_all, _, aproximaciones_auto = salsa.procesar_progresion_salsa(
+            progression_text
+        )
 
         if not asignaciones_all:
             raise ValueError("Progresión vacía")
@@ -114,7 +116,11 @@ def generate_montuno(
         )
         register_offsets_norm = _normalise_int_sequence(register_offsets, 0, num_chords)
         inversiones = _normalise_optional_sequence(inversiones_por_indice, num_chords)
-        aproximaciones = _normalise_nested_notes(aproximaciones_por_indice, num_chords)
+        aproximaciones = (
+            _normalise_nested_notes(aproximaciones_por_indice, num_chords)
+            if aproximaciones_por_indice is not None
+            else aproximaciones_auto
+        )
 
         inversion_limpia = limpiar_inversion(inversion)
 

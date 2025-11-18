@@ -51,4 +51,16 @@ describe('parseProgression', () => {
     expect(result.chords.map((c) => c.name)).toEqual(['C13', 'Gm7(11)']);
     expect(result.chords.every((c) => c.isRecognized)).toBe(true);
   });
+
+  it('aplica marcadores de aproximaciones a los acordes siguientes', () => {
+    const result = parseProgression('[ ] Am7 | E7 | [Bb C#] Dm7 | A7 | [ ] C', {
+      armonizacionDefault: 'Octavas',
+    });
+
+    expect(result.chords[0]?.approachNotes).toEqual(['D', 'F', 'A', 'B']);
+    expect(result.chords[1]?.approachNotes).toEqual(['D', 'F', 'A', 'B']);
+    expect(result.chords[2]?.approachNotes).toEqual(['C#', 'F', 'A', 'Bb']);
+    expect(result.chords[3]?.approachNotes).toEqual(['C#', 'F', 'A', 'Bb']);
+    expect(result.chords[4]?.approachNotes).toEqual(['D', 'F', 'A', 'B']);
+  });
 });

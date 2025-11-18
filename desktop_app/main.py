@@ -1188,7 +1188,7 @@ def main():
             return
         try:
             print("\n[DEBUG] Texto original que va al parser:", repr(prog))
-            asign, _ = salsa.procesar_progresion_salsa(prog)
+            asign, _, _ = salsa.procesar_progresion_salsa(prog)
         except Exception as e:
             status_var.set(str(e))
             return

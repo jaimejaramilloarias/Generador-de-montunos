@@ -50,7 +50,7 @@ describe('generateMontuno', () => {
         octavacion: 'Original',
         inversion: null,
         registerOffset: 0,
-        approachNotes: deriveApproachNotes('Cmaj7'),
+        approachNotes: deriveApproachNotes(),
         isRecognized: true,
       },
       {
@@ -62,7 +62,7 @@ describe('generateMontuno', () => {
         octavacion: 'Original',
         inversion: null,
         registerOffset: 0,
-        approachNotes: deriveApproachNotes('F7'),
+        approachNotes: deriveApproachNotes(),
         isRecognized: true,
       },
       {
@@ -74,7 +74,7 @@ describe('generateMontuno', () => {
         octavacion: 'Original',
         inversion: null,
         registerOffset: 0,
-        approachNotes: deriveApproachNotes('G7'),
+        approachNotes: deriveApproachNotes(),
         isRecognized: true,
       },
       {
@@ -86,7 +86,7 @@ describe('generateMontuno', () => {
         octavacion: 'Original',
         inversion: null,
         registerOffset: 0,
-        approachNotes: deriveApproachNotes('Cmaj7'),
+        approachNotes: deriveApproachNotes(),
         isRecognized: true,
       },
     ],

@@ -107,6 +107,7 @@ export interface ParsedChord {
   raw: string;
   index: number;
   isRecognized: boolean;
+  approachNotes: string[];
   armonizacion?: Armonizacion;
   forcedInversion?: Inversion | null;
 }
