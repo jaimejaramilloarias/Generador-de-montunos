@@ -17,10 +17,11 @@ import {
   setIsGenerating,
   setProgression,
   setSeed,
+  setVariation,
   subscribe,
   resetChordOverrides,
 } from '../state/store';
-import { CLAVES } from '../types/constants';
+import { CLAVES, VARIACIONES } from '../types/constants';
 import type { AppState, GenerationResult, MidiStatus } from '../types';
 import { CHORD_SUFFIX_SUGGESTIONS, getChordSuffixSuggestions } from '../utils/chordAutocomplete';
 import { isExtendedChordName } from '../utils/chords';
@@ -104,6 +105,15 @@ function getMidiManagerModule(): Promise<MidiManagerModule> {
     midiManagerModulePromise = import('../midi/manager');
   }
   return midiManagerModulePromise;
+}
+
+function pickRandomVariation(current: AppState['variation']): AppState['variation'] {
+  const options = VARIACIONES.filter((variation) => variation !== current);
+  if (!options.length) {
+    return current;
+  }
+  const index = Math.floor(Math.random() * options.length);
+  return options[index];
 }
 
 function scheduleModulePrefetch(): void {
@@ -731,7 +741,10 @@ async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefine
   try {
     const generatorPromise = getGeneratorModule();
     const state = getState();
-    const shouldPrepareAudio = !state.selectedMidiOutputId;
+    const nextVariation = pickRandomVariation(state.variation);
+    setVariation(nextVariation);
+    const stateWithVariation = getState();
+    const shouldPrepareAudio = !stateWithVariation.selectedMidiOutputId;
     const audioPromise: Promise<AudioModule | null> = shouldPrepareAudio
       ? getAudioModule()
       : Promise.resolve<AudioModule | null>(null);
