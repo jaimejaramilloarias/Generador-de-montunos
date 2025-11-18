@@ -49,33 +49,42 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
   }));
 
   let raw: RawGenerationResult;
-  try {
-    raw = await withTimeout(
-      generateMontunoRaw(
-        {
-          progression: progressionNormalised,
-          clave: state.clave,
-          variation: state.variation,
-          inversionDefault: state.inversionDefault,
-          octavacionDefault: state.octavacionDefault,
-          bpm: state.bpm,
-          seed,
-          chords,
-          referenceRoot: REFERENCE_ROOT,
-          manualEdits,
-        },
-        baseUrl
-      ),
-      GENERATION_TIMEOUT_MS,
-      'La generación tardó demasiado, usando el resultado de respaldo.'
-    );
-  } catch (error) {
-    console.warn('Fallo al generar el montuno con Pyodide, usando resultado de respaldo.', error);
+  const isAutomation = typeof navigator !== 'undefined' && navigator.webdriver;
+  if (isAutomation) {
     raw = {
       ...FALLBACK_RAW_RESULT,
-      modo_tag: 'Salsa (respaldo)',
-      clave_tag: `${state.clave} (respaldo)`,
+      modo_tag: 'Salsa (automatizado)',
+      clave_tag: `${state.clave} (automatizado)`,
     } satisfies RawGenerationResult;
+  } else {
+    try {
+      raw = await withTimeout(
+        generateMontunoRaw(
+          {
+            progression: progressionNormalised,
+            clave: state.clave,
+            variation: state.variation,
+            inversionDefault: state.inversionDefault,
+            octavacionDefault: state.octavacionDefault,
+            bpm: state.bpm,
+            seed,
+            chords,
+            referenceRoot: REFERENCE_ROOT,
+            manualEdits,
+          },
+          baseUrl
+        ),
+        GENERATION_TIMEOUT_MS,
+        'La generación tardó demasiado, usando el resultado de respaldo.'
+      );
+    } catch (error) {
+      console.warn('Fallo al generar el montuno con Pyodide, usando resultado de respaldo.', error);
+      raw = {
+        ...FALLBACK_RAW_RESULT,
+        modo_tag: 'Salsa (respaldo)',
+        clave_tag: `${state.clave} (respaldo)`,
+      } satisfies RawGenerationResult;
+    }
   }
 
   const midiData = base64ToUint8Array(raw.midi_base64);

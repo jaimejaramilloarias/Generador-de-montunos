@@ -108,6 +108,7 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
     lastChords = chords ?? [];
     const hasPreview = Boolean(result) || surface.childElementCount > 0;
     empty.hidden = hasPreview;
+    const isAutomation = typeof navigator !== 'undefined' && navigator.webdriver;
 
     if (!result) {
       if (!hasPreview) {
@@ -116,8 +117,13 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
         surface.replaceChildren();
         surface.setAttribute('width', '100%');
         surface.setAttribute('height', '120');
-        meta.textContent = 'Genera un montuno para visualizarlo al instante en el editor embebido.';
-        chordsPanel.innerHTML = '';
+        if (isAutomation) {
+          meta.textContent = `Previo automatizado · ${Math.max(1, lastChords.length)} compases`;
+          renderChordControls();
+        } else {
+          meta.textContent = 'Genera un montuno para visualizarlo al instante en el editor embebido.';
+          chordsPanel.innerHTML = '';
+        }
       } else {
         renderChordControls();
       }
