@@ -6,6 +6,7 @@ interface ViewerActions {
   onModeChange?: (index: number, mode: Modo) => void;
   onArmonizacionChange?: (index: number, armonizacion: Armonizacion) => void;
   onApproachChange?: (index: number, notes: string[]) => void;
+  onOctaveShift?: (index: number, delta: 1 | -1) => void;
 }
 
 interface ViewerState {
@@ -286,7 +287,16 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
       const bassDown = createActionButton('↓', 'Bajar nota grave', () => actions.onBassNudge?.(chord.index, -1));
       bassGroup.append(bassLabel, bassDown, bassUp);
 
-      actionsRow.append(bassGroup);
+      const octaveGroup = document.createElement('div');
+      octaveGroup.className = 'signal-viewer__control-group';
+      const octaveLabel = document.createElement('span');
+      octaveLabel.className = 'signal-viewer__tag';
+      octaveLabel.textContent = 'Octava';
+      const octaveDown = createActionButton('−8va', 'Bajar octava', () => actions.onOctaveShift?.(chord.index, -1));
+      const octaveUp = createActionButton('+8va', 'Subir octava', () => actions.onOctaveShift?.(chord.index, 1));
+      octaveGroup.append(octaveLabel, octaveDown, octaveUp);
+
+      actionsRow.append(bassGroup, octaveGroup);
       card.append(name, metaRow, primaryControls, actionsRow);
       grid.appendChild(card);
     });

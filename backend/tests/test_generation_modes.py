@@ -96,3 +96,41 @@ def test_per_chord_modes_override_default():
 
     assert calls["salsa"] == 1
     assert calls["trad"] == 1
+
+
+def test_approach_notes_are_only_used_for_salsa_segments():
+    calls = {"trad": 0, "salsa": 0}
+    captured = {}
+
+    def _stub_salsa(*args, **kwargs):
+        calls["salsa"] += 1
+        captured["kwargs"] = kwargs
+        output = args[2]
+        from pretty_midi import Instrument, Note, PrettyMIDI
+
+        pm = PrettyMIDI()
+        inst = Instrument(program=0)
+        inst.notes.append(Note(velocity=90, pitch=60, start=0, end=1))
+        pm.instruments.append(inst)
+        pm.write(str(output))
+
+    stub_trad = _stub_writer(calls, "trad")
+
+    with patch.object(modos, "montuno_salsa", _stub_salsa), patch.object(
+        modos, "montuno_tradicional", stub_trad
+    ), patch.dict(modos.MODOS_DISPONIBLES, {"Salsa": _stub_salsa, "Tradicional": stub_trad}):
+        generate_montuno(
+            "C∆ F7",
+            clave_config=CLAVES["Clave 2-3"],
+            modo_default="Tradicional",
+            modo_por_acorde=["Tradicional", "Salsa"],
+            aproximaciones_por_indice=[["C#"], ["D"]],
+            armonizacion_default="Octavas",
+            variacion="A",
+            inversion="root",
+            reference_root=Path("backend/reference_midi_loops"),
+        )
+
+    assert calls["trad"] == 1
+    assert calls["salsa"] == 1
+    assert captured.get("kwargs", {}).get("aproximaciones_por_acorde") == [["D"]]

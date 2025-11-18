@@ -116,6 +116,12 @@ body {
   align-items: end;
 }
 
+.transpose-controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .saved-controls {
   display: flex;
   flex-wrap: wrap;

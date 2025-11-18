@@ -8,7 +8,9 @@ import {
   setDefaultOctavacion,
   setDefaultModo,
   shiftAllInversions,
+  shiftAllOctaves,
   nudgeChordBass,
+  shiftChordOctave,
   setMidiOutputs,
   setMidiStatus,
   setSelectedMidiOutput,
@@ -49,6 +51,8 @@ interface UiRefs {
   armonizacionContainer: HTMLDivElement;
   octavacionSelect: HTMLSelectElement;
   bpmInput: HTMLInputElement;
+  octaveUpBtn: HTMLButtonElement;
+  octaveDownBtn: HTMLButtonElement;
   inversionShiftUpBtn: HTMLButtonElement;
   inversionShiftDownBtn: HTMLButtonElement;
   generateBtn: HTMLButtonElement;
@@ -369,6 +373,7 @@ export function setupApp(root: HTMLElement): void {
     onApproachChange: (index, notes) => {
       setChord(index, { approachNotes: notes });
     },
+    onOctaveShift: (index, delta) => shiftChordOctave(index, delta),
   });
   bindStaticEvents(refs, root);
   subscribe((state) => {
@@ -427,6 +432,13 @@ function buildLayout(): string {
               <div class="input-group">
                 <label for="bpm">Tempo</label>
                 <input id="bpm" type="number" min="60" max="220" step="1" />
+              </div>
+              <div class="input-group input-group--stacked">
+                <span>Transposición global de octava</span>
+                <div class="transpose-controls" role="group" aria-label="Transponer todas las octavas">
+                  <button type="button" id="octave-down" class="icon-btn icon-btn--pill">−8va</button>
+                  <button type="button" id="octave-up" class="icon-btn icon-btn--pill">+8va</button>
+                </div>
               </div>
             </div>
             <div class="midi-controls midi-controls--compact" aria-label="Conexión MIDI">
@@ -548,6 +560,8 @@ function grabRefs(root: HTMLElement): UiRefs {
     armonizacionContainer: root.querySelector<HTMLDivElement>('#armonizacion-default')!,
     octavacionSelect: root.querySelector<HTMLSelectElement>('#octavacion')!,
     bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
+    octaveUpBtn: root.querySelector<HTMLButtonElement>('#octave-up')!,
+    octaveDownBtn: root.querySelector<HTMLButtonElement>('#octave-down')!,
     inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
     inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
     resetOverridesBtn: root.querySelector<HTMLButtonElement>('#reset-overrides')!,
@@ -607,6 +621,14 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     const bpm = Number.isFinite(value) ? Math.min(220, Math.max(60, value)) : 120;
     (event.target as HTMLInputElement).value = String(bpm);
     setBpm(bpm);
+  });
+
+  refs.octaveDownBtn.addEventListener('click', () => {
+    shiftAllOctaves(-1);
+  });
+
+  refs.octaveUpBtn.addEventListener('click', () => {
+    shiftAllOctaves(1);
   });
 
   refs.inversionShiftUpBtn.addEventListener('click', () => {
