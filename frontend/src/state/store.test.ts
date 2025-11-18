@@ -12,7 +12,6 @@ let setChord: (
   patch: Partial<Pick<AppState['chords'][number], 'modo' | 'armonizacion' | 'octavacion' | 'inversion'>>
 ) => void;
 let recalculateInversions: () => void;
-let resetChordOverrides: () => void;
 
 async function importStore() {
   const store = await import('./store');
@@ -24,7 +23,6 @@ async function importStore() {
   setDefaultModo = store.setDefaultModo;
   setChord = store.setChord;
   recalculateInversions = store.recalculateInversions;
-  resetChordOverrides = store.resetChordOverrides;
 }
 
 describe('state/store saved progressions', () => {
@@ -72,44 +70,44 @@ describe('state/store saved progressions', () => {
     expect(state.activeProgressionId).toBeNull();
   });
 
-  it('usa el modo tradicional como predeterminado', () => {
+  it('detecta acordes extendidos y fuerza el modo extendido', () => {
     setProgression('Cmaj9 | Dm7(9) G7');
     const state = getState();
-    expect(state.chords.every((chord) => chord.modo === 'Tradicional')).toBe(true);
+    expect(state.chords[0]?.modo).toBe('Extendido');
+    expect(state.chords[0]?.inversion).toBeNull();
+    expect(state.chords[1]?.modo).toBe('Extendido');
+    expect(state.chords[2]?.modo).toBe('Tradicional');
   });
 
-  it('permite cambiar el modo global a salsa', () => {
+  it('permite cambiar el modo global a extendido', () => {
     setProgression('Cmaj7 F7 | G7 Cmaj7');
-    setDefaultModo('Salsa');
+    setDefaultModo('Extendido');
 
     const state = getState();
-    expect(state.chords.every((chord) => chord.modo === 'Salsa')).toBe(true);
-    expect(state.modoDefault).toBe('Salsa');
+    expect(state.chords.every((chord) => chord.modo === 'Extendido')).toBe(true);
+    expect(state.modoDefault).toBe('Extendido');
   });
 
-  it('mantiene overrides manuales al actualizar el modo global', () => {
-    setProgression('Cmaj9 | Dm9 G9');
-    setChord(0, { modo: 'Salsa' });
-
+  it('mantiene el modo extendido en acordes con tensiones al cambiar el modo global', () => {
+    setProgression('Cmaj9 | Dm7(9) G7');
     setDefaultModo('Tradicional');
 
     const state = getState();
-    expect(state.chords[0]?.modo).toBe('Salsa');
-    expect(state.chords[1]?.modo).toBe('Tradicional');
+    expect(state.chords[0]?.modo).toBe('Extendido');
+    expect(state.chords[1]?.modo).toBe('Extendido');
     expect(state.chords[2]?.modo).toBe('Tradicional');
     expect(state.modoDefault).toBe('Tradicional');
   });
 
-  it('permite ajustar el modo de cualquier acorde sin imponer un modo oculto', () => {
-    setProgression('Cmaj7 | Dm7 G7');
-    setDefaultModo('Salsa');
+  it('permite ajustar el modo de cualquier acorde, aunque el cifrado sea extendido', () => {
+    setProgression('Cmaj9 | Dm9 G9');
     setChord(0, { modo: 'Tradicional' });
-    setChord(2, { modo: 'Tradicional' });
+    setChord(2, { modo: 'Salsa' });
 
     const state = getState();
     expect(state.chords[0]?.modo).toBe('Tradicional');
-    expect(state.chords[1]?.modo).toBe('Salsa');
-    expect(state.chords[2]?.modo).toBe('Tradicional');
+    expect(state.chords[1]?.modo).toBe('Extendido');
+    expect(state.chords[2]?.modo).toBe('Salsa');
   });
 
   it('recalcular inversiones restablece los enlaces ignorando overrides manuales', () => {
@@ -120,20 +118,5 @@ describe('state/store saved progressions', () => {
 
     const state = getState();
     expect(state.chords[0]?.inversion).toBe('root');
-  });
-
-  it('limpia los overrides manuales y restablece los acordes a los valores por defecto', () => {
-    setProgression('Cmaj7 G7/B');
-    setDefaultModo('Salsa');
-    setChord(0, { modo: 'Tradicional', armonizacion: 'Doble octava', inversion: 'third' });
-    setChord(1, { octavacion: 'Octava arriba', inversion: 'fifth' });
-
-    resetChordOverrides();
-
-    const state = getState();
-    expect(state.chords.every((chord) => chord.modo === state.modoDefault)).toBe(true);
-    expect(state.chords.every((chord) => chord.registerOffset === 0)).toBe(true);
-    expect(state.chords[0]?.inversion).toBeNull();
-    expect(state.chords[1]?.inversion).toBeNull();
   });
 });
