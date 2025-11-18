@@ -748,16 +748,26 @@ def montuno_salsa(
                 }
             )
 
-        deltas_por_pc: Dict[str, int] = {}
+        deltas_por_pc_y_inicio: Dict[Tuple[str, float], int] = {}
+
+        def _key_para_inicio(posicion: float) -> float:
+            """Normaliza ``posicion`` para usarla como parte de una clave de agrupación."""
+
+            return round(posicion, 6)
+
         for trad in traducciones:
             delta = trad["pitch_ajustado"] - trad["pitch_base"]
             pc = trad["pc"]
-            if pc not in deltas_por_pc or (deltas_por_pc[pc] == 0 and delta != 0):
-                deltas_por_pc[pc] = delta
+            clave = (pc, _key_para_inicio(trad["pos"]["start"]))
+            if clave not in deltas_por_pc_y_inicio or (
+                deltas_por_pc_y_inicio[clave] == 0 and delta != 0
+            ):
+                deltas_por_pc_y_inicio[clave] = delta
 
         for trad in traducciones:
             pos = trad["pos"]
-            delta = deltas_por_pc.get(trad["pc"], 0)
+            clave = (trad["pc"], _key_para_inicio(pos["start"]))
+            delta = deltas_por_pc_y_inicio.get(clave, 0)
             pitch = trad["pitch_base"] + delta
 
             inicio = cor * grid + pos["start"]
