@@ -62,6 +62,15 @@ def _normalise_optional_sequence(
     return result[:length]
 
 
+def _normalise_int_sequence(
+    values: Optional[Sequence[Optional[int]]], default: int, length: int
+) -> List[int]:
+    result = [default if value is None else int(value) for value in (values or [])]
+    if len(result) < length:
+        result.extend([default] * (length - len(result)))
+    return result[:length]
+
+
 def _is_extended_chord(symbol: str) -> bool:
     base = symbol.split("/")[0]
     sufijo = ""
@@ -103,6 +112,7 @@ def generate_montuno(
     inversion: str,
     reference_root: Path,
     inversiones_por_indice: Optional[Sequence[Optional[str]]] = None,
+    register_offsets: Optional[Sequence[Optional[int]]] = None,
     aproximaciones_por_indice: Optional[Sequence[Optional[Sequence[str]]]] = None,
     manual_edits: Optional[List[Dict]] = None,
     seed: Optional[int] = None,
@@ -134,6 +144,7 @@ def generate_montuno(
         octavaciones = _normalise_sequence(
             octavas_por_indice, octavacion_default, num_chords
         )
+        register_offsets_norm = _normalise_int_sequence(register_offsets, 0, num_chords)
         inversiones = _normalise_optional_sequence(inversiones_por_indice, num_chords)
         aproximaciones = _normalise_nested_notes(aproximaciones_por_indice, num_chords)
 
@@ -146,7 +157,8 @@ def generate_montuno(
             salsa._ajustar_rango_flexible,
             salsa.seleccionar_inversion,
             inversiones_por_indice,
-            offset_getter=lambda idx: salsa._offset_octavacion(octavaciones[idx]),
+            offset_getter=lambda idx: salsa._offset_octavacion(octavaciones[idx])
+            + register_offsets_norm[idx] * 12,
             return_pitches=True,
         )
 
