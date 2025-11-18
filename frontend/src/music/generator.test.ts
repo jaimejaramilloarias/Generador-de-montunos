@@ -121,37 +121,34 @@ describe('generateMontuno', () => {
     expect(Number(result.durationSeconds.toFixed(6))).toBeCloseTo(expectedSeconds, 6);
   });
 
-  it('propaga correctamente los modos por acorde', async () => {
+  it('propaga correctamente los modos extendidos y por acorde', async () => {
     const customState: AppState = {
       ...baseState,
-      modoDefault: 'Salsa',
+      modoDefault: 'Extendido',
       chords: baseState.chords.map((chord, index) =>
-        index % 2 === 0 ? { ...chord, modo: 'Salsa' } : { ...chord, modo: 'Tradicional' }
+        index % 2 === 0
+          ? { ...chord, modo: 'Extendido' }
+          : { ...chord, modo: 'Tradicional' }
       ),
     };
 
     await generateMontuno(customState);
 
     const [payload] = (generateMontunoRaw as unknown as Mock).mock.calls.at(-1) ?? [];
-    expect(payload.modoDefault).toBe('Salsa');
+    expect(payload.modoDefault).toBe('Extendido');
     expect(payload.chords).toHaveLength(customState.chords.length);
     expect(payload.chords.map((chord: AppState['chords'][number]) => chord.modo)).toEqual(
       customState.chords.map((chord) => chord.modo)
     );
-    expect(
-      payload.chords.every(
-        (chord: AppState['chords'][number] & { resolvedInversion: string }) =>
-          typeof chord.resolvedInversion === 'string'
-      )
-    ).toBe(true);
+    expect(payload.chords.every((chord: AppState['chords'][number]) => typeof chord.inversion === 'string')).toBe(true);
   });
 
-  it('respeta overrides individuales aun con modo global tradicional', async () => {
+  it('mantiene disponible el modo extendido como override por acorde con modo global tradicional', async () => {
     const customState: AppState = {
       ...baseState,
       modoDefault: 'Tradicional',
       chords: baseState.chords.map((chord, index) =>
-        index === 1 ? { ...chord, modo: 'Salsa' } : chord
+        index === 1 ? { ...chord, modo: 'Extendido' } : chord
       ),
     };
 
@@ -162,12 +159,7 @@ describe('generateMontuno', () => {
     expect(payload.chords.map((chord: AppState['chords'][number]) => chord.modo)).toEqual(
       customState.chords.map((chord) => chord.modo)
     );
-    expect(
-      payload.chords.every(
-        (chord: AppState['chords'][number] & { resolvedInversion: string }) =>
-          typeof chord.resolvedInversion === 'string'
-      )
-    ).toBe(true);
+    expect(payload.chords.every((chord: AppState['chords'][number]) => typeof chord.inversion === 'string')).toBe(true);
   });
 
   it('recorta notas superpuestas cuando cambian los modos por acorde', async () => {

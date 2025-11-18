@@ -28,52 +28,44 @@ def _stub_writer(calls, key):
     return _impl
 
 
-def _recording_stub(logs, key):
-    def _impl(*args, **kwargs):
-        logs[key].append(kwargs.get("inicio_cor"))
-        output = args[2]
-        from pretty_midi import Instrument, Note, PrettyMIDI
-
-        pm = PrettyMIDI()
-        inst = Instrument(program=0)
-        start = float(kwargs.get("inicio_cor") or 0)
-        inst.notes.append(Note(velocity=90, pitch=60, start=start, end=start + 1))
-        pm.instruments.append(inst)
-        pm.write(str(output))
-
-    return _impl
-
-
-def test_tradicional_is_used_when_set_as_default():
-    calls = {"trad": 0, "salsa": 0}
-    stub_salsa = _stub_writer(calls, "salsa")
+def test_extendido_is_used_when_set_as_default():
+    calls = {"trad": 0, "ext": 0}
+    stub_ext = _stub_writer(calls, "ext")
     stub_trad = _stub_writer(calls, "trad")
 
-    with patch.dict(modos.MODOS_DISPONIBLES, {"Salsa": stub_salsa, "Tradicional": stub_trad}):
+    with patch.object(modos, "montuno_extendido", stub_ext), patch.object(
+        modos, "montuno_tradicional", stub_trad
+    ), patch.dict(
+        modos.MODOS_DISPONIBLES, {"Extendido": stub_ext, "Tradicional": stub_trad}
+    ):
         generate_montuno(
             "C∆ F7",
             clave_config=CLAVES["Clave 2-3"],
-            modo_default="Tradicional",
+            modo_default="Extendido",
             armonizacion_default="Octavas",
             variacion="A",
             inversion="root",
             reference_root=Path("backend/reference_midi_loops"),
         )
 
-    assert calls["trad"] == 1
-    assert calls["salsa"] == 0
+    assert calls["ext"] == 1
+    assert calls["trad"] == 0
 
 
 def test_missing_modo_entries_fall_back_to_default():
-    calls = {"trad": 0, "salsa": 0}
-    stub_salsa = _stub_writer(calls, "salsa")
+    calls = {"trad": 0, "ext": 0}
+    stub_ext = _stub_writer(calls, "ext")
     stub_trad = _stub_writer(calls, "trad")
 
-    with patch.dict(modos.MODOS_DISPONIBLES, {"Salsa": stub_salsa, "Tradicional": stub_trad}):
+    with patch.object(modos, "montuno_extendido", stub_ext), patch.object(
+        modos, "montuno_tradicional", stub_trad
+    ), patch.dict(
+        modos.MODOS_DISPONIBLES, {"Extendido": stub_ext, "Tradicional": stub_trad}
+    ):
         generate_montuno(
             "C∆ F7",
             clave_config=CLAVES["Clave 2-3"],
-            modo_default="Salsa",
+            modo_default="Extendido",
             modo_por_acorde=[None, None],
             armonizacion_default="Octavas",
             variacion="A",
@@ -81,27 +73,30 @@ def test_missing_modo_entries_fall_back_to_default():
             reference_root=Path("backend/reference_midi_loops"),
         )
 
-    assert calls["salsa"] == 1
+    assert calls["ext"] == 1
     assert calls["trad"] == 0
 
 
-def test_overrides_replace_previous_modes_without_overlap():
-    logs = {"trad": [], "salsa": []}
-    stub_salsa = _recording_stub(logs, "salsa")
-    stub_trad = _recording_stub(logs, "trad")
+def test_extended_chords_force_extended_mode_even_with_traditional_default():
+    calls = {"trad": 0, "ext": 0}
+    stub_ext = _stub_writer(calls, "ext")
+    stub_trad = _stub_writer(calls, "trad")
 
-    with patch.dict(modos.MODOS_DISPONIBLES, {"Salsa": stub_salsa, "Tradicional": stub_trad}):
+    with patch.object(modos, "montuno_extendido", stub_ext), patch.object(
+        modos, "montuno_tradicional", stub_trad
+    ), patch.dict(
+        modos.MODOS_DISPONIBLES, {"Extendido": stub_ext, "Tradicional": stub_trad}
+    ):
         generate_montuno(
-            "C∆ F7",
+            "Cmaj9 F7",
             clave_config=CLAVES["Clave 2-3"],
-            modo_default="Salsa",
-            modo_por_acorde=["Tradicional", "Salsa"],
+            modo_default="Tradicional",
+            modo_por_acorde=["Tradicional", "Tradicional"],
             armonizacion_default="Octavas",
             variacion="A",
             inversion="root",
             reference_root=Path("backend/reference_midi_loops"),
         )
 
-    assert logs["trad"] == [0]
-    assert len(logs["salsa"]) == 1
-    assert logs["salsa"][0] > logs["trad"][0]
+    assert calls["ext"] == 1
+    assert calls["trad"] == 1

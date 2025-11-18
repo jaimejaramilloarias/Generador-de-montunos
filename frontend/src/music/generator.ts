@@ -19,8 +19,7 @@ export async function generateMontuno(state: AppState): Promise<GenerationResult
     modo: chord.modo,
     armonizacion: chord.armonizacion,
     octavacion: chord.octavacion,
-    inversion: chord.inversion,
-    resolvedInversion: resolvedInversions[idx]?.inversion ?? chord.inversion ?? state.inversionDefault,
+    inversion: resolvedInversions[idx]?.inversion ?? chord.inversion ?? null,
     registerOffset: chord.registerOffset,
     approachNotes: chord.approachNotes,
   }));

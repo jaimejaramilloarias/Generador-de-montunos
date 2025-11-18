@@ -71,6 +71,19 @@ def _normalise_int_sequence(
     return result[:length]
 
 
+def _is_extended_chord(symbol: str) -> bool:
+    base = symbol.split("/")[0]
+    sufijo = ""
+    for idx, char in enumerate(base):
+        if char.isalpha() and char.upper() in "ABCDEFG" and idx == 0:
+            continue
+        sufijo = base[idx:]
+        break
+    if not sufijo:
+        return False
+    return any(token in sufijo for token in ("9", "11", "13"))
+
+
 def _normalise_nested_notes(
     values: Optional[Sequence[Optional[Sequence[str]]]], length: int
 ) -> List[Optional[List[str]]]:
@@ -99,7 +112,6 @@ def generate_montuno(
     inversion: str,
     reference_root: Path,
     inversiones_por_indice: Optional[Sequence[Optional[str]]] = None,
-    inversiones_usuario: Optional[Sequence[Optional[str]]] = None,
     register_offsets: Optional[Sequence[Optional[int]]] = None,
     aproximaciones_por_indice: Optional[Sequence[Optional[Sequence[str]]]] = None,
     manual_edits: Optional[List[Dict]] = None,
@@ -133,8 +145,7 @@ def generate_montuno(
             octavas_por_indice, octavacion_default, num_chords
         )
         register_offsets_norm = _normalise_int_sequence(register_offsets, 0, num_chords)
-        inversiones_calculadas = _normalise_optional_sequence(inversiones_por_indice, num_chords)
-        inversiones_manual = _normalise_optional_sequence(inversiones_usuario, num_chords)
+        inversiones = _normalise_optional_sequence(inversiones_por_indice, num_chords)
         aproximaciones = _normalise_nested_notes(aproximaciones_por_indice, num_chords)
 
         inversion_limpia = limpiar_inversion(inversion)
@@ -145,18 +156,17 @@ def generate_montuno(
             salsa.get_bass_pitch,
             salsa._ajustar_rango_flexible,
             salsa.seleccionar_inversion,
-            inversiones_manual,
+            inversiones_por_indice,
             offset_getter=lambda idx: salsa._offset_octavacion(octavaciones[idx])
             + register_offsets_norm[idx] * 12,
             return_pitches=True,
         )
 
-        inversiones = [
-            inv_manual or inv_calc or default_inv
-            for inv_manual, inv_calc, default_inv in zip(
-                inversiones_manual, inversiones_calculadas, default_inversions
-            )
-        ]
+        inversiones = [inv or default_inv for inv, default_inv in zip(inversiones, default_inversions)]
+
+        for idx, asign in enumerate(asignaciones_all):
+            if modos[idx] != "Extendido" and _is_extended_chord(asign[0]):
+                modos[idx] = "Extendido"
 
         segmentos: List[_Segment] = []
         start = 0
@@ -216,8 +226,7 @@ def generate_montuno(
                     midi_ref_seg = reference_root / (
                         f"salsa_{clave_tag}_{inversion_limpia}_{_DEF_VARIATIONS[sufijo_idx % 4]}.mid"
                     )
-                    first_idx = segmento.chord_indices[0]
-                    arg_extra = limpiar_inversion(inversiones[first_idx] or inversion_limpia)
+                    arg_extra = inversion_limpia
                 else:
                     midi_ref_seg = reference_root / f"{clave_config.midi_prefix}_{variacion}.mid"
                     arg_extra = armonizacion_default
@@ -231,7 +240,6 @@ def generate_montuno(
                 asign_seg = [tuple(a) for a in segmento.assignments]
                 kwargs = {"asignaciones_custom": asign_seg}
                 inv_seg = [inversiones[i] for i in segmento.chord_indices]
-                inv_manual_seg = [inversiones_manual[i] for i in segmento.chord_indices]
                 bass_seg = [bass_targets[i] for i in segmento.chord_indices]
                 reg_seg = [register_offsets_norm[i] for i in segmento.chord_indices]
                 oct_seg = [octavaciones[i] for i in segmento.chord_indices]
@@ -242,8 +250,8 @@ def generate_montuno(
                 if segmento.mode == "Salsa":
                     aprox_seg = [aproximaciones[i] for i in segmento.chord_indices]
                     kwargs["aproximaciones_por_acorde"] = aprox_seg
-                    if any(inv_manual_seg):
-                        kwargs["inversiones_manual"] = inv_manual_seg
+                    if any(inv_seg):
+                        kwargs["inversiones_manual"] = inv_seg
                 else:
                     if any(inv_seg):
                         suf_map = {"root": "1", "third": "3", "fifth": "5", "seventh": "7"}
