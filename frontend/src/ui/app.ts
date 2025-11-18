@@ -726,7 +726,9 @@ async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefine
       ? getAudioModule()
       : Promise.resolve<AudioModule | null>(null);
     const [generator, audio] = await Promise.all([generatorPromise, audioPromise]);
-    const result = await generator.generateMontuno(state);
+    setSeed(generator.createRandomSeed());
+    const stateWithSeed = getState();
+    const result = await generator.generateMontuno(stateWithSeed);
     setGenerated(result);
     setErrors([]);
     resetPlayback();

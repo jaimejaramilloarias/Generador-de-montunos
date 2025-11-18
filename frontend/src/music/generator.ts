@@ -144,10 +144,14 @@ function trimOverlappingNotes(events: NoteEvent[]): NoteEvent[] {
   return sanitized.filter((event) => event.duration > 1e-6);
 }
 
-function resolveSeed(seed: number | null): number | null {
+function resolveSeed(seed: number | null): number {
   if (typeof seed === 'number' && Number.isFinite(seed)) {
     return seed;
   }
+  return createRandomSeed();
+}
+
+export function createRandomSeed(): number {
   if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
     const buffer = new Uint32Array(1);
     crypto.getRandomValues(buffer);
