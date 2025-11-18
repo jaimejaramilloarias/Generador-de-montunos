@@ -790,6 +790,31 @@ input[type='number'] {
   min-width: 220px;
 }
 
+.signal-viewer__field--approach {
+  gap: 0.5rem;
+}
+
+.signal-viewer__approach-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.signal-viewer__approach-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.signal-viewer__input--compact {
+  padding: 0.25rem 0.45rem;
+}
+
+.signal-viewer__tag--sub {
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 .signal-viewer__field--disabled .signal-viewer__select {
   opacity: 0.6;
   cursor: not-allowed;

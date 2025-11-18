@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # salsa.py
 from pathlib import Path
-from typing import List, Tuple, Dict, Optional, Set
+from typing import List, Tuple, Dict, Optional, Set, Iterable
 import pretty_midi
 
 import re
@@ -40,21 +40,120 @@ def _normalizar_token_nota(token: str) -> str:
     return token[0].upper() + token[1:]
 
 
+def _normalizar_nota_tonal(token: str) -> Optional[str]:
+    token = _normalizar_token_nota(token)
+    if not token:
+        return None
+    if len(token) >= 2 and token[1] in {"b", "#"}:
+        base = token[:2].upper()
+        resto = token[2:]
+    else:
+        base = token[0].upper()
+        resto = token[1:]
+    return base + resto
+
+
+def _parsear_cifrado_seguro(cifrado: str) -> Tuple[int, str]:
+    try:
+        return parsear_nombre_acorde(cifrado)
+    except ValueError:
+        base = re.sub(r"maj", "∆", cifrado, flags=re.IGNORECASE)
+        base = re.sub(r"(9|11|13)$", "", base)
+        return parsear_nombre_acorde(base)
+
+
+def _prefer_flat_names(cifrado: str) -> bool:
+    root_symbol = re.match(r"^[A-G](b|#)?", cifrado)
+    if not root_symbol:
+        return False
+    return "b" in root_symbol.group(0)
+
+
+def _pc_to_note(pc: int, use_flats: bool) -> str:
+    pc = pc % 12
+    flat_names = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
+    sharp_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    names = flat_names if use_flats else sharp_names
+    return names[pc]
+
+
+def _detalles_intervalos(cifrado: str) -> Tuple[int, List[int]]:
+    root, suf = _parsear_cifrado_seguro(cifrado)
+    return root, INTERVALOS_TRADICIONALES[suf]
+
+
+def _calcular_aproximaciones_default(cifrado: str) -> List[str]:
+    """Devuelve las 4 notas de aproximación (2, 4, 6, 7) según las reglas nuevas."""
+
+    root, ints = _detalles_intervalos(cifrado)
+    text = cifrado.lower()
+    third = ints[1] if len(ints) > 1 else 4
+    fifth = ints[2] if len(ints) > 2 else 7
+    seventh = ints[3] if len(ints) > 3 else None
+
+    has_b9 = "b9" in text
+    has_sharp9 = "#9" in text or "+9" in text
+    has_natural_9 = "9" in text and not has_b9 and not has_sharp9
+
+    if has_b9:
+        second_int = 1
+    elif has_sharp9:
+        second_int = 3
+    elif has_natural_9:
+        second_int = 2
+    else:
+        second_int = 2
+
+    fifth_simple = fifth - (ints[0] if ints else 0)
+    use_flats = _prefer_flat_names(cifrado) or has_b9 or fifth_simple == 6
+
+    minor_third = third - (ints[0] if ints else 0) == 3 or "m7(b5)" in text or "ø" in text or "º" in text
+    fourth_int = 5 if minor_third else 6
+    if fifth_simple == 6:
+        sixth_int = 8
+    elif fifth_simple == 8:
+        sixth_int = 8
+    else:
+        sixth_int = 9
+
+    if seventh is not None or "7" in text:
+        seventh_int = seventh if seventh is not None else 10
+    else:
+        seventh_int = 10
+
+    pcs = [second_int, fourth_int, sixth_int, seventh_int]
+    return [_pc_to_note(root + interval, use_flats) for interval in pcs]
+
+
+def get_default_approach_notes_for_chord(cifrado: str) -> List[str]:
+    """Wrapper público para exponer las 4 aproximaciones por acorde."""
+
+    return _calcular_aproximaciones_default(cifrado)
+
+
+def _normalizar_lista_aproximaciones(raw: Optional[Iterable[str]], defaults: List[str]) -> List[str]:
+    if raw is None:
+        return defaults
+    cleaned: List[str] = []
+    for token in raw:
+        norm = _normalizar_nota_tonal(str(token))
+        if norm:
+            cleaned.append(norm)
+    if len(cleaned) < 4:
+        cleaned.extend(defaults[len(cleaned) :])
+    return cleaned[:4]
+
+
 def _preparar_aproximaciones(
-    aproximaciones_por_acorde: Optional[List[Optional[List[str]]]], total: int
-) -> List[Set[str]]:
-    aproximaciones: List[Set[str]] = []
-    for idx in range(total):
+    aproximaciones_por_acorde: Optional[List[Optional[List[str]]]],
+    asignaciones: List[Tuple[str, List[int], str, Optional[str]]],
+) -> List[Dict[str, object]]:
+    aproximaciones: List[Dict[str, object]] = []
+    for idx, (cifrado, _, _, _) in enumerate(asignaciones):
+        defaults = _calcular_aproximaciones_default(cifrado)
         raw = aproximaciones_por_acorde[idx] if aproximaciones_por_acorde and idx < len(aproximaciones_por_acorde) else None
-        if raw is None:
-            aproximaciones.append(set(APPROACH_NOTES))
-            continue
-        normalizadas: Set[str] = set()
-        for token in raw:
-            norm = _normalizar_token_nota(token)
-            if norm:
-                normalizadas.add(norm)
-        aproximaciones.append(normalizadas or set(APPROACH_NOTES))
+        notas = _normalizar_lista_aproximaciones(raw, defaults)
+        aproximaciones.append({"tokens": set(APPROACH_NOTES), "notas": notas})
     return aproximaciones
 
 
@@ -201,26 +300,32 @@ def seleccionar_inversion(
 # ========================
 
 
+def _intervalo_por_nota_aproximacion(
+    role: str, root: int, aproximaciones: Dict[str, object], defaults: List[str]
+) -> int:
+    notes = aproximaciones.get("notas") if isinstance(aproximaciones, dict) else None
+    notas = notes if isinstance(notes, list) else defaults
+    index_map = {"2": 0, "4": 1, "6": 2, "7": 3}
+    idx = index_map[role]
+    nota_objetivo = notas[idx] if idx < len(notas) else defaults[idx]
+    pc_map = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
+    pc = pc_map.get(nota_objetivo, 0)
+    return (pc - root) % 12
+
+
 def traducir_nota(
-    note_name: str, cifrado: str, aproximaciones: Optional[Set[str]] = None
+    note_name: str, cifrado: str, aproximaciones: Optional[Dict[str, object]] = None
 ) -> Tuple[int, bool]:
-    """Traduce ``note_name`` según las reglas del modo salsa.
+    """Traduce ``note_name`` según las reglas del modo salsa."""
 
-    Devuelve el ``pitch`` calculado y un flag indicando si la nota es de
-    aproximación.
-    """
-
-    root, suf = parsear_nombre_acorde(cifrado)
+    root, suf = _parsear_cifrado_seguro(cifrado)
     ints = INTERVALOS_TRADICIONALES[suf]
-
-    is_minor = ints[1] - ints[0] == 3 or "m" in suf or "m7(b5)" in suf or "º" in suf
-    has_b9 = "b9" in cifrado
-    has_b13 = "b13" in cifrado
-    has_b5 = "b5" in cifrado
-    extra_b6 = "(b6)" in cifrado
-    extra_b13 = "(b13)" in cifrado
-
-    approx = set(APPROACH_NOTES) if aproximaciones is None else set(aproximaciones)
+    approx_cfg: Dict[str, object] = aproximaciones or {}
+    approx_tokens = set(APPROACH_NOTES)
+    if isinstance(aproximaciones, dict):
+        tokens = aproximaciones.get("tokens")
+        if isinstance(tokens, set) and tokens:
+            approx_tokens = approx_tokens.union(tokens)
 
     name = note_name[:-1]
     octave = int(note_name[-1])
@@ -228,48 +333,51 @@ def traducir_nota(
     def midi(interval: int) -> int:
         return root + interval + 12 * (octave + 1)
 
+    es_aprox = name in approx_tokens
     interval = None
-    es_aprox = name in approx
+
+    third = ints[1] if len(ints) > 1 else 4
+    fifth = ints[2] if len(ints) > 2 else 7
+    seventh = ints[3] if len(ints) > 3 else None
+
+    aprox_default = _calcular_aproximaciones_default(cifrado)
+
+    def intervalo_aprox(role: str) -> int:
+        return _intervalo_por_nota_aproximacion(role, root, approx_cfg, aprox_default)
 
     if name == "C":
         interval = 0
     elif name == "E":
-        interval = 5 if "sus" in suf else ints[1]
+        interval = 5 if "sus" in suf else third
     elif name == "G":
-        interval = ints[2]
+        interval = fifth
     elif name == "D":
-        if has_b5:
-            interval = 1
-        else:
-            interval = 1 if has_b9 else 2
-        es_aprox = es_aprox or name in approx
-    elif name == "A":
-        if has_b9 or has_b13 or has_b5 or extra_b6 or extra_b13:
-            interval = 8
-        else:
-            interval = 9
-        es_aprox = es_aprox or name in approx
-    elif name == "B":
-        if suf.endswith("6") and "7" not in suf:
-            interval = 11
-        else:
-            interval = ints[3] if len(ints) > 3 else 11
-        es_aprox = es_aprox or name in approx
-    elif name == "D#":
-        third_int = 3 if is_minor else 4
-        interval = third_int - 1
-        es_aprox = es_aprox or name in approx
-    elif name == "F":
-        interval = 5
-        es_aprox = es_aprox or name in approx
-    elif name == "G#":
-        interval = ints[2] - 1
-        es_aprox = es_aprox or name in approx
+        interval = intervalo_aprox("2")
+        es_aprox = True
     elif name == "C#":
-        interval = 11 if has_b9 else 1
-        es_aprox = es_aprox or name in approx
+        interval = intervalo_aprox("2")
+        es_aprox = True
+    elif name == "D#":
+        interval = intervalo_aprox("2")
+        es_aprox = True
+    elif name == "F":
+        interval = intervalo_aprox("4")
+        es_aprox = True
+    elif name == "A":
+        interval = intervalo_aprox("6")
+        es_aprox = True
+    elif name == "G#":
+        interval = intervalo_aprox("6")
+        es_aprox = True
+    elif name == "B":
+        if suf.endswith("6") and "7" not in suf and seventh is None:
+            interval = 11
+            es_aprox = False
+        else:
+            interval = intervalo_aprox("7")
+            es_aprox = True
     else:
-        return pretty_midi.note_name_to_number(note_name), name in approx
+        return pretty_midi.note_name_to_number(note_name), es_aprox
 
     return midi(interval), es_aprox
 
@@ -497,7 +605,7 @@ def montuno_salsa(
     octavaciones = octavaciones_custom or [octavacion_default or "Original"] * len(
         asignaciones
     )
-    aproximaciones = _preparar_aproximaciones(aproximaciones_por_acorde, len(asignaciones))
+    aproximaciones = _preparar_aproximaciones(aproximaciones_por_acorde, asignaciones)
 
     # --------------------------------------------------------------
     # Selección de la inversión para cada acorde enlazando la voz grave

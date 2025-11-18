@@ -23,6 +23,4 @@ export const INVERSIONES: Record<Inversion, string> = {
 };
 export const INVERSION_ORDER: Inversion[] = ['root', 'third', 'fifth', 'seventh'];
 
-export const DEFAULT_SALSA_APPROACH_NOTES = ['D', 'A', 'B', 'D#', 'F', 'G#', 'C#'];
-
 export const STORAGE_KEY = 'montuno-web/preferences/v1';

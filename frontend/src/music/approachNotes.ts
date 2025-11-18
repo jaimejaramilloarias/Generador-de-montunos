@@ -1,82 +1,61 @@
-import { DEFAULT_SALSA_APPROACH_NOTES } from '../types/constants';
 import { detectIntervals, extractRootSymbol, getChordRootSemitone } from './chords';
 
-const SEMITONE_TO_NOTE = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const SHARP_NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const FLAT_NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
-function intervalToNote(rootPc: number, interval: number): string {
+function prefersFlats(chordName: string): boolean {
+  const match = chordName.match(/^([A-G](?:b|#)?)/i);
+  return Boolean(match && match[1].includes('b'));
+}
+
+function intervalToNote(rootPc: number, interval: number, useFlats: boolean): string {
   const semitone = ((rootPc + interval) % 12 + 12) % 12;
-  return SEMITONE_TO_NOTE[semitone];
+  const names = useFlats ? FLAT_NOTES : SHARP_NOTES;
+  return names[semitone];
 }
 
-function pickInterval(templateNote: string, intervals: number[], suffix: string): number | null {
-  const third = intervals[1] ?? 4;
-  const fifth = intervals[2] ?? 7;
-  const seventh = intervals[3] ?? 11;
-
+function detectNinthInterval(suffix: string): number {
   const lowered = suffix.toLowerCase();
-  const isMinor =
-    third - (intervals[0] ?? 0) === 3 || /m7\(b5\)|(^|[^a-z])m(?!aj)/.test(lowered) || /º|°/.test(lowered);
-  const hasB9 = suffix.includes('b9');
-  const hasSharp9 = /#9|\+9/.test(suffix);
-  const hasB13 = suffix.includes('b13');
-  const hasB5 = suffix.includes('b5');
-  const extraB6 = suffix.includes('(b6)');
-  const extraB13 = suffix.includes('(b13)');
-
-  switch (templateNote) {
-    case 'C':
-      return 0;
-    case 'E':
-      return suffix.includes('sus') ? 5 : third;
-    case 'G':
-      return fifth;
-    case 'D':
-      if (hasB5 || hasB9) return 1;
-      if (hasSharp9) return 3;
-      return 2;
-    case 'A':
-      return hasB9 || hasB13 || hasB5 || extraB6 || extraB13 ? 8 : 9;
-    case 'B':
-      return suffix.endsWith('6') && !suffix.includes('7') ? 11 : seventh;
-    case 'D#': {
-      const thirdInt = isMinor ? 3 : 4;
-      return thirdInt - 1;
-    }
-    case 'F':
-      return 5;
-    case 'G#':
-      return fifth - 1;
-    case 'C#':
-      if (hasB9) return 11;
-      if (hasSharp9) return 3;
-      return null;
-    default:
-      return null;
-  }
+  if (lowered.includes('b9')) return 1;
+  if (/#9|\+9/.test(lowered)) return 3;
+  if (lowered.includes('9')) return 2;
+  return 2;
 }
 
-export function deriveApproachNotes(chordName: string): string {
-  const rootPc = getChordRootSemitone(chordName) ?? 0;
+function detectFourthInterval(intervals: number[]): number {
+  const third = intervals[1] ?? 4;
+  const isMinor = third - (intervals[0] ?? 0) === 3;
+  return isMinor ? 5 : 6;
+}
+
+function detectSixthInterval(intervals: number[]): number {
+  const fifth = intervals[2] ?? 7;
+  const diff = fifth - (intervals[0] ?? 0);
+  if (diff === 6 || diff === 8) return 8;
+  return 9;
+}
+
+function detectSeventhInterval(intervals: number[], suffix: string): number {
+  if (intervals.length > 3) {
+    return intervals[3];
+  }
+  const lowered = suffix.toLowerCase();
+  if (/maj7|ma7|∆/.test(lowered)) return 11;
+  if (/7/.test(lowered)) return 10;
+  return 10;
+}
+
+export function deriveApproachNotes(chordName: string): string[] {
   const rootSymbol = extractRootSymbol(chordName) ?? '';
-  const suffix = chordName.slice(rootSymbol.length).toLowerCase();
+  const suffix = chordName.slice(rootSymbol.length);
+  const rootPc = getChordRootSemitone(chordName) ?? 0;
   const intervals = detectIntervals(chordName);
+  const useFlats = prefersFlats(rootSymbol) || /b9|b5|b13/.test(suffix);
 
-  const hasFlatNine = suffix.includes('b9');
-  const hasSharpNine = /#9|\+9/.test(suffix);
-  const templateNotes =
-    hasFlatNine || hasSharpNine
-      ? DEFAULT_SALSA_APPROACH_NOTES
-      : DEFAULT_SALSA_APPROACH_NOTES.filter((note) => note !== 'C#');
+  const second = detectNinthInterval(suffix);
+  const fourth = detectFourthInterval(intervals);
+  const sixth = detectSixthInterval(intervals);
+  const seventh = detectSeventhInterval(intervals, suffix);
 
-  const translated = templateNotes
-    .map((note) => {
-      const result = pickInterval(note, intervals, suffix);
-      if (result === null) {
-        return note;
-      }
-      return intervalToNote(rootPc, result);
-    })
-    .filter((value, index, list) => list.indexOf(value) === index);
-
-  return translated.join(', ');
+  return [second, fourth, sixth, seventh].map((interval) => intervalToNote(rootPc, interval, useFlats));
 }
