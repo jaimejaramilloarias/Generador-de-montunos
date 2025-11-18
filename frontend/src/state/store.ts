@@ -15,7 +15,6 @@ import {
   CLAVES,
   INVERSIONES,
   INVERSION_ORDER,
-  MODOS,
   OCTAVACIONES,
   VARIACIONES,
 } from '../types/constants';
@@ -107,7 +106,7 @@ function createInitialState(): AppState {
   const base: AppState = {
     progressionInput,
     clave: persisted?.clave && CLAVES[persisted.clave] ? persisted.clave : 'Clave 2-3',
-    modoDefault: persisted?.modoDefault && MODOS.includes(persisted.modoDefault) ? persisted.modoDefault : 'Tradicional',
+    modoDefault: 'Salsa',
     armonizacionDefault:
       persisted?.armonizacionDefault && ARMONIZACIONES.includes(persisted.armonizacionDefault)
         ? persisted.armonizacionDefault
@@ -172,12 +171,11 @@ function buildChords(
 
     if (prev && prev.name === chord.name) {
       const nextInversion = forcedInversion ?? prev.inversion ?? null;
-      const nextModo = prev.modo ?? base.modoDefault;
       return {
         ...prev,
         index,
         label: chord.raw,
-        modo: nextModo,
+        modo: base.modoDefault,
         armonizacion,
         octavacion,
         inversion: nextInversion,
@@ -187,12 +185,11 @@ function buildChords(
       } satisfies ChordConfig;
     }
 
-    const nextModo = base.modoDefault;
     return {
       index,
       label: chord.raw,
       name: chord.name,
-      modo: nextModo,
+      modo: base.modoDefault,
       armonizacion,
       octavacion: base.octavacionDefault,
       inversion: forcedInversion,
@@ -268,12 +265,6 @@ export function setProgression(progressionInput: string): void {
   applyProgression(progressionInput);
 }
 
-export function setDefaultModo(modo: Modo): void {
-  const chords = state.chords.map((chord) => ({ ...chord, modo }));
-  updateState({ modoDefault: modo, chords });
-  markDirty();
-}
-
 export function setDefaultArmonizacion(armonizacion: AppState['armonizacionDefault']): void {
   const chords = state.chords.map((chord) => ({ ...chord, armonizacion }));
   updateState({ armonizacionDefault: armonizacion, chords });
@@ -331,30 +322,15 @@ export function setChord(
     if (chord.index !== index) {
       return chord;
     }
-    const patchIncludesModo = patch.modo !== undefined && patch.modo !== chord.modo;
-    const modoAdjustedPatch = patchIncludesModo
-      ? {
-          ...patch,
-          armonizacion: patch.modo === 'Tradicional' ? state.armonizacionDefault : chord.armonizacion,
-          approachNotes:
-            patch.modo === 'Salsa'
-              ? deriveApproachNotes(chord.name)
-              : normaliseApproachNotes(deriveApproachNotes(chord.name)),
-        }
-      : patch;
     const next: ChordConfig = {
       ...chord,
-      ...modoAdjustedPatch,
+      ...patch,
       ...(normalisedApproach !== undefined ? { approachNotes: normalisedApproach } : {}),
-      inversion: modoAdjustedPatch.inversion === undefined ? chord.inversion : modoAdjustedPatch.inversion,
+      inversion: patch.inversion === undefined ? chord.inversion : patch.inversion,
     };
-    const shouldResetOctavacion = patchIncludesModo && patch.modo === 'Tradicional';
-    const shouldResetApproach = patchIncludesModo && patch.modo === 'Salsa';
-    next.octavacion = shouldResetOctavacion ? state.octavacionDefault : next.octavacion;
-    next.registerOffset = patchIncludesModo ? 0 : next.registerOffset;
-    next.approachNotes = shouldResetApproach
-      ? normaliseApproachNotes(deriveApproachNotes(chord.name))
-      : next.approachNotes;
+    if (patch.registerOffset !== undefined) {
+      next.registerOffset = clampRegisterOffset(patch.registerOffset);
+    }
     return next;
   });
   updateState({ chords });

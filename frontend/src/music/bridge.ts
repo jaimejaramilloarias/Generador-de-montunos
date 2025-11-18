@@ -3,8 +3,6 @@ import type { AppState } from '../types';
 export interface RawGenerationInput {
   progression: string;
   clave: string;
-  modoDefault: AppState['modoDefault'];
-  armonizacionDefault: AppState['armonizacionDefault'];
   octavacionDefault: AppState['octavacionDefault'];
   variation: AppState['variation'];
   inversionDefault: AppState['inversionDefault'];
@@ -12,8 +10,6 @@ export interface RawGenerationInput {
   seed: number | null;
   chords: {
     index: number;
-    modo: AppState['modoDefault'];
-    armonizacion: AppState['armonizacionDefault'];
     octavacion: AppState['octavacionDefault'];
     inversion: AppState['inversionDefault'] | null;
     registerOffset: number;

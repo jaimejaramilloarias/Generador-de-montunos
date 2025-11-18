@@ -3,11 +3,8 @@ import backendUtils from '../../../backend/utils.py?raw';
 import backendStyleUtils from '../../../backend/style_utils.py?raw';
 import backendMidiCommon from '../../../backend/midi_common.py?raw';
 import backendMidiUtils from '../../../backend/midi_utils.py?raw';
-import backendMidiUtilsTrad from '../../../backend/midi_utils_tradicional.py?raw';
-import backendModos from '../../../backend/modos.py?raw';
 import backendSalsa from '../../../backend/salsa.py?raw';
 import backendVoicings from '../../../backend/voicings.py?raw';
-import backendVoicingsTrad from '../../../backend/voicings_tradicional.py?raw';
 import montunoInit from '../../../backend/montuno_core/__init__.py?raw';
 import montunoConfig from '../../../backend/montuno_core/config.py?raw';
 import montunoGeneration from '../../../backend/montuno_core/generation.py?raw';
@@ -20,11 +17,8 @@ export const PYTHON_SOURCES: Record<string, string> = {
   'backend/style_utils.py': backendStyleUtils,
   'backend/midi_common.py': backendMidiCommon,
   'backend/midi_utils.py': backendMidiUtils,
-  'backend/midi_utils_tradicional.py': backendMidiUtilsTrad,
-  'backend/modos.py': backendModos,
   'backend/salsa.py': backendSalsa,
   'backend/voicings.py': backendVoicings,
-  'backend/voicings_tradicional.py': backendVoicingsTrad,
   'backend/montuno_core/__init__.py': montunoInit,
   'backend/montuno_core/config.py': montunoConfig,
   'backend/montuno_core/generation.py': montunoGeneration,

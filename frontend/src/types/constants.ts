@@ -1,17 +1,15 @@
-import type { Armonizacion, Inversion, Modo, Octavacion, Variacion } from './index';
+import type { Armonizacion, Inversion, Octavacion, Variacion } from './index';
 
 export const CLAVES: Record<string, { label: string; description: string }> = {
   'Clave 2-3': {
     label: 'Clave 2-3',
-    description: 'Patrón tradicional con acento inicial en dos golpes.',
+    description: 'Patrón con acento inicial en dos golpes.',
   },
   'Clave 3-2': {
     label: 'Clave 3-2',
     description: 'Patrón invertido con tres golpes al inicio.',
   },
 };
-
-export const MODOS: Modo[] = ['Tradicional', 'Salsa'];
 export const ARMONIZACIONES: Armonizacion[] = ['Octavas', 'Doble octava', 'Décimas', 'Treceavas'];
 export const OCTAVACIONES: Octavacion[] = ['Original', 'Octava arriba', 'Octava abajo'];
 export const VARIACIONES: Variacion[] = ['A', 'B', 'C', 'D'];

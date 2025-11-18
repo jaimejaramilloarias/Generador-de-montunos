@@ -16,12 +16,12 @@ class ClaveConfig:
 
 CLAVES: Dict[str, ClaveConfig] = {
     "Clave 2-3": ClaveConfig(
-        midi_prefix="tradicional_2-3",
+        midi_prefix="salsa_2-3",
         primer_bloque=[3, 4, 4, 3],
         patron_repetido=[5, 4, 4, 3],
     ),
     "Clave 3-2": ClaveConfig(
-        midi_prefix="tradicional_3-2",
+        midi_prefix="salsa_3-2",
         primer_bloque=[3, 3, 5, 4],
         patron_repetido=[4, 3, 5, 4],
     ),

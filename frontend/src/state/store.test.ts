@@ -6,11 +6,10 @@ let setProgression: (progression: string) => void;
 let saveCurrentProgression: (name: string) => void;
 let loadSavedProgression: (id: string) => void;
 let deleteSavedProgression: (id: string) => void;
-let setDefaultModo: (modo: AppState['modoDefault']) => void;
 let setChord: (
   index: number,
   patch: Partial<
-    Pick<AppState['chords'][number], 'modo' | 'armonizacion' | 'octavacion' | 'inversion' | 'registerOffset'>
+    Pick<AppState['chords'][number], 'armonizacion' | 'octavacion' | 'inversion' | 'registerOffset'>
   >
 ) => void;
 let recalculateInversions: () => void;
@@ -25,7 +24,6 @@ async function importStore() {
   saveCurrentProgression = store.saveCurrentProgression;
   loadSavedProgression = store.loadSavedProgression;
   deleteSavedProgression = store.deleteSavedProgression;
-  setDefaultModo = store.setDefaultModo;
   setChord = store.setChord;
   recalculateInversions = store.recalculateInversions;
   resetChordOverrides = store.resetChordOverrides;
@@ -78,35 +76,21 @@ describe('state/store saved progressions', () => {
     expect(state.activeProgressionId).toBeNull();
   });
 
-  it('permite cambiar el modo global a salsa', () => {
+  it('asigna el modo salsa a todos los acordes por defecto', () => {
     setProgression('Cmaj7 F7 | G7 Cmaj7');
-    setDefaultModo('Salsa');
 
     const state = getState();
     expect(state.chords.every((chord) => chord.modo === 'Salsa')).toBe(true);
     expect(state.modoDefault).toBe('Salsa');
   });
 
-  it('cambiar un acorde de salsa a tradicional sobrescribe los ajustes conflictivos', () => {
-    setDefaultModo('Salsa');
-    setProgression('Cmaj7 F7');
-    setChord(0, { modo: 'Tradicional', octavacion: 'Octava arriba', inversion: 'third', registerOffset: 2 });
-
-    const state = getState();
-    expect(state.chords[0]?.modo).toBe('Tradicional');
-    expect(state.chords[0]?.octavacion).toBe(state.octavacionDefault);
-    expect(state.chords[0]?.registerOffset).toBe(0);
-    expect(state.chords[0]?.inversion).toBe('third');
-  });
-
   it('restablece los overrides al usar el botón global de reseteo', () => {
     setProgression('Cmaj7 F7');
-    setChord(0, { modo: 'Salsa', octavacion: 'Octava abajo', inversion: 'fifth', registerOffset: -1 });
+    setChord(0, { octavacion: 'Octava abajo', inversion: 'fifth', registerOffset: -1 });
 
     resetChordOverrides();
 
     const state = getState();
-    expect(state.chords[0]?.modo).toBe(state.modoDefault);
     expect(state.chords[0]?.octavacion).toBe(state.octavacionDefault);
     expect(state.chords[0]?.inversion).toBeNull();
     expect(state.chords[0]?.registerOffset).toBe(0);
