@@ -86,7 +86,7 @@ export function mountSignalViewer(container: HTMLElement, actions: ViewerActions
 
   const empty = document.createElement('div');
   empty.className = 'signal-viewer__empty';
-  empty.innerHTML = '<p>Sin datos MIDI. Genera o reproduce un montuno para activar la vista.</p>';
+  empty.innerHTML = '';
 
   const wrapper = document.createElement('div');
   wrapper.className = 'signal-viewer__canvas';

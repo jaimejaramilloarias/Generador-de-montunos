@@ -1,9 +1,6 @@
 import {
   getState,
-  deleteSavedProgression,
-  loadSavedProgression,
   resetPlayback,
-  saveCurrentProgression,
   setBpm,
   setChord,
   setClave,
@@ -20,7 +17,6 @@ import {
   setIsPlaying,
   setIsGenerating,
   setProgression,
-  setSeed,
   subscribe,
   recalculateInversions,
 } from '../state/store';
@@ -53,7 +49,6 @@ interface UiRefs {
   armonizacionContainer: HTMLDivElement;
   octavacionSelect: HTMLSelectElement;
   bpmInput: HTMLInputElement;
-  seedInput: HTMLInputElement;
   inversionShiftUpBtn: HTMLButtonElement;
   inversionShiftDownBtn: HTMLButtonElement;
   recalculateInversionsBtn: HTMLButtonElement;
@@ -64,9 +59,6 @@ interface UiRefs {
   summary: HTMLDivElement;
   signalViewer: HTMLDivElement;
   signalOpenLink: HTMLAnchorElement;
-  saveNameInput: HTMLInputElement;
-  saveButton: HTMLButtonElement;
-  savedList: HTMLUListElement;
   chordHints: HTMLDivElement;
   midiEnableBtn: HTMLButtonElement;
   midiOutputSelect: HTMLSelectElement;
@@ -81,12 +73,12 @@ const MIDI_STATUS_MESSAGES: Record<MidiStatus, string> = {
   denied: 'El acceso MIDI fue denegado. Intenta permitirlo nuevamente.',
 };
 
-const MIDI_BUTTON_LABELS: Record<MidiStatus, string> = {
-  unavailable: 'MIDI no disponible',
-  idle: 'Activar MIDI',
-  pending: 'Activando…',
-  ready: 'Actualizar puertos',
-  denied: 'Reintentar acceso',
+const MIDI_BUTTON_STATES: Record<MidiStatus, { icon: string; tooltip: string }> = {
+  unavailable: { icon: '🚫', tooltip: 'MIDI no disponible' },
+  idle: { icon: '🎛', tooltip: 'Activar MIDI' },
+  pending: { icon: '⏳', tooltip: 'Activando MIDI…' },
+  ready: { icon: '🔄', tooltip: 'Actualizar puertos MIDI' },
+  denied: { icon: '⚠️', tooltip: 'Reintentar acceso MIDI' },
 };
 
 function getGeneratorModule(): Promise<GeneratorModule> {
@@ -364,8 +356,6 @@ async function togglePlayback(refs: UiRefs): Promise<void> {
   }, result.durationSeconds * 1000 + 100);
 }
 
-let lastActiveProgressionId: string | null = null;
-
 export function setupApp(root: HTMLElement): void {
   root.innerHTML = buildLayout();
   const refs = grabRefs(root);
@@ -401,12 +391,67 @@ function buildLayout(): string {
         <h1>Generador de Montunos</h1>
         <p>Desarrollado por Jaime Jaramillo Arias.</p>
       </header>
-      <section class="app__body">
+      <section class="app__stack">
         <form class="panel" id="montuno-form">
-          <fieldset class="panel__section">
+          <fieldset class="panel__section panel__section--controls">
+            <legend>Parámetros base</legend>
+            <div class="panel__section-header">
+              <p>Define tono, modo, tempo y configura la salida MIDI en un solo lugar.</p>
+            </div>
+            <div class="control-grid">
+              <div>
+                <label class="input-group">
+                  <span>Clave</span>
+                  <select id="clave"></select>
+                </label>
+              </div>
+              <div>
+                <label class="input-group">
+                  <span>Modo por defecto</span>
+                  <select id="modo"></select>
+                </label>
+              </div>
+              <div>
+                <div id="armonizacion-default" class="harmonizacion-default">
+                  <label class="input-group">
+                    <span>Armonización por defecto</span>
+                    <select id="armonizacion"></select>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label class="input-group">
+                  <span>Octavación por defecto</span>
+                  <select id="octavacion"></select>
+                </label>
+              </div>
+              <div class="input-group">
+                <label for="bpm">Tempo</label>
+                <input id="bpm" type="number" min="60" max="220" step="1" />
+              </div>
+            </div>
+            <div class="midi-controls midi-controls--compact" aria-label="Conexión MIDI">
+              <button
+                type="button"
+                id="midi-enable"
+                class="icon-btn icon-btn--pill"
+                title="Gestionar acceso MIDI"
+                aria-label="Gestionar acceso MIDI"
+              >
+                🎛
+              </button>
+              <select id="midi-output" disabled>
+                <option value="">Selecciona un puerto</option>
+              </select>
+              <p id="midi-status" class="midi-status">El navegador no ha solicitado acceso MIDI.</p>
+            </div>
+          </fieldset>
+          <fieldset class="panel__section panel__section--progression">
             <legend>Progresión de acordes</legend>
+            <div class="panel__section-header">
+              <p>Separa acordes con espacios o barras verticales. Puedes incluir tensiones como Cm7(b5).</p>
+            </div>
             <textarea id="progression" rows="4" spellcheck="false" placeholder="Cmaj7 F7 | G7 Cmaj7"></textarea>
-            <p class="panel__hint">Separa acordes con espacios o barras verticales. Puedes incluir tensiones como Cm7(b5).</p>
             <div
               id="chord-suffix-hints"
               class="suffix-hints suffix-hints--hidden"
@@ -415,146 +460,85 @@ function buildLayout(): string {
             ></div>
             <div id="errors" class="errors" aria-live="assertive"></div>
           </fieldset>
-          <fieldset class="panel__section grid">
-            <div>
-              <label class="input-group">
-                <span>Clave</span>
-                <select id="clave"></select>
-              </label>
-            </div>
-            <div>
-              <label class="input-group">
-                <span>Modo por defecto</span>
-                <select id="modo"></select>
-              </label>
-            </div>
-            <div>
-              <div id="armonizacion-default" class="harmonizacion-default">
-                <label class="input-group">
-                  <span>Armonización por defecto</span>
-                  <select id="armonizacion"></select>
-                </label>
-              </div>
-            </div>
-            <div>
-              <label class="input-group">
-                <span>Octavación por defecto</span>
-                <select id="octavacion"></select>
-              </label>
-            </div>
-            <div class="input-group">
-              <label for="bpm">Tempo</label>
-              <input id="bpm" type="number" min="60" max="220" step="1" />
-            </div>
-            <div class="input-group">
-              <label for="seed">Semilla</label>
-              <input id="seed" type="number" min="0" placeholder="Aleatorio" />
-            </div>
-          </fieldset>
-          <section class="panel__section">
-            <header class="panel__section-header">
-              <h2>Conexión MIDI</h2>
-              <p>Envía el montuno a un dispositivo local mediante Web MIDI.</p>
-            </header>
-            <div class="midi-controls">
-              <button type="button" id="midi-enable" class="btn">Activar MIDI</button>
-              <select id="midi-output" disabled>
-                <option value="">Selecciona un puerto</option>
-              </select>
-            </div>
-            <p id="midi-status" class="midi-status">El navegador no ha solicitado acceso MIDI.</p>
-          </section>
-          <section class="panel__section">
-            <header class="panel__section-header">
-              <h2>Progresiones guardadas</h2>
-              <p>Conserva tus progresiones favoritas para reutilizarlas en el futuro.</p>
-            </header>
-            <div class="saved-controls">
-              <label class="input-group saved-controls__input">
-                <span>Nombre</span>
-                <input id="saved-name" type="text" placeholder="Intro en C mayor" autocomplete="off" />
-              </label>
-              <button type="button" id="save-progression" class="btn">Guardar progresión</button>
-            </div>
-            <ul id="saved-progressions" class="saved-list" aria-live="polite"></ul>
-          </section>
-          <section class="panel__section panel__section--actions">
-          </section>
         </form>
-        <aside class="summary" aria-live="polite">
-          <h2>Resultado</h2>
-          <div id="summary-content" class="summary__content">
-            <p>Genera un montuno para ver los detalles de duración, compases y variaciones.</p>
-          </div>
-        </aside>
-      </section>
-      <section class="app__signal" aria-label="Editor MIDI Signal">
-        <section class="signal-embed">
-          <div class="signal-embed__header">
-            <div>
-              <h3>Editor MIDI Signal integrado</h3>
-              <p>Visualiza al instante el montuno generado, ajusta cada acorde y mándalo a Signal con un solo clic.</p>
+
+        <section class="panel__section panel__section--editor" aria-label="Editor MIDI Signal">
+          <div class="summary summary--compact" aria-live="polite">
+            <h2>Resultado</h2>
+            <div id="summary-content" class="summary__content">
+              <p>Genera un montuno para ver los detalles de duración, compases y variaciones.</p>
             </div>
-            <div class="signal-embed__toolbar" aria-label="Reproducción y controles avanzados">
-              <button
-                type="button"
-                id="generate"
-                class="icon-btn"
-                title="Generar montuno"
-                aria-label="Generar montuno"
-              >
-                ⟳
-              </button>
-              <button
-                type="button"
-                id="play"
-                class="icon-btn"
-                title="Reproducir o detener"
-                aria-label="Reproducir o detener"
-              >
-                ⏯
-              </button>
-              <button
-                type="button"
-                id="download"
-                class="icon-btn"
-                title="Descargar MIDI"
-                aria-label="Descargar MIDI"
-                disabled
-              >
-                ⬇
-              </button>
-              <div class="icon-btn__group" role="group" aria-label="Desplazar inversiones">
-                <button type="button" id="shift-inv-up" class="icon-btn" title="Subir inversiones">⤴</button>
-                <button type="button" id="shift-inv-down" class="icon-btn" title="Bajar inversiones">⤵</button>
+          </div>
+          <section class="signal-embed">
+            <div class="signal-embed__header">
+              <div>
+                <h3>Editor MIDI integrado</h3>
+                <p>Visualiza el montuno, ajusta cada acorde y envíalo a Signal.</p>
               </div>
-              <button
-                type="button"
-                id="recalculate-inversions"
-                class="icon-btn icon-btn--wide"
-                title="Recalcular inversiones para corregir enlaces extraños"
-              >
-                Recalcular inversiones
-              </button>
+              <div class="signal-embed__toolbar" aria-label="Reproducción y controles avanzados">
+                <button
+                  type="button"
+                  id="generate"
+                  class="icon-btn"
+                  title="Generar montuno"
+                  aria-label="Generar montuno"
+                >
+                  ⟳
+                </button>
+                <button
+                  type="button"
+                  id="play"
+                  class="icon-btn"
+                  title="Reproducir o detener"
+                  aria-label="Reproducir o detener"
+                >
+                  ⏯
+                </button>
+                <button
+                  type="button"
+                  id="download"
+                  class="icon-btn"
+                  title="Descargar MIDI"
+                  aria-label="Descargar MIDI"
+                  disabled
+                >
+                  ⬇
+                </button>
+                <div class="icon-btn__group" role="group" aria-label="Desplazar inversiones">
+                  <button type="button" id="shift-inv-up" class="icon-btn" title="Subir inversiones">⤴</button>
+                  <button type="button" id="shift-inv-down" class="icon-btn" title="Bajar inversiones">⤵</button>
+                </div>
+                <button
+                  type="button"
+                  id="recalculate-inversions"
+                  class="icon-btn icon-btn--wide"
+                  title="Recalcular inversiones para corregir enlaces extraños"
+                  aria-label="Recalcular inversiones"
+                >
+                  ♻
+                </button>
+              </div>
+              <div class="signal-embed__cta-group">
+                <a
+                  id="signal-open"
+                  class="icon-btn icon-btn--pill signal-embed__cta"
+                  href="https://signalmidi.app/edit"
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Abrir Signal y pegar el MIDI generado"
+                  aria-label="Abrir Signal y pegar el MIDI generado"
+                >
+                  ⇱
+                </a>
+              </div>
             </div>
-            <div class="signal-embed__cta-group">
-              <a
-                id="signal-open"
-                class="btn signal-embed__cta"
-                href="https://signalmidi.app/edit"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Abrir Signal
-              </a>
+            <div class="signal-embed__preview signal-embed__preview--full">
+              <div id="signal-viewer" class="signal-viewer"></div>
+              <p class="signal-embed__hint">
+                Se actualiza automáticamente al regenerar o cambiar parámetros. Ajusta modo, armonización y nota grave por acorde justo debajo del gráfico.
+              </p>
             </div>
-          </div>
-          <div class="signal-embed__preview signal-embed__preview--full">
-            <div id="signal-viewer" class="signal-viewer"></div>
-            <p class="signal-embed__hint">
-              Se actualiza automáticamente al regenerar o cambiar parámetros. Ajusta modo, armonización y nota grave por acorde justo debajo del gráfico.
-            </p>
-          </div>
+          </section>
         </section>
       </section>
 
@@ -567,28 +551,24 @@ function grabRefs(root: HTMLElement): UiRefs {
     progressionInput: root.querySelector<HTMLTextAreaElement>('#progression')!,
     claveSelect: root.querySelector<HTMLSelectElement>('#clave')!,
     modoSelect: root.querySelector<HTMLSelectElement>('#modo')!,
-    armonizacionSelect: root.querySelector<HTMLSelectElement>('#armonizacion')!,
-    armonizacionContainer: root.querySelector<HTMLDivElement>('#armonizacion-default')!,
-    octavacionSelect: root.querySelector<HTMLSelectElement>('#octavacion')!,
-    bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
-    seedInput: root.querySelector<HTMLInputElement>('#seed')!,
-    inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
-    inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
-    recalculateInversionsBtn: root.querySelector<HTMLButtonElement>('#recalculate-inversions')!,
-    generateBtn: root.querySelector<HTMLButtonElement>('#generate')!,
-    playBtn: root.querySelector<HTMLButtonElement>('#play')!,
-    downloadBtn: root.querySelector<HTMLButtonElement>('#download')!,
-    errorList: root.querySelector<HTMLDivElement>('#errors')!,
-    summary: root.querySelector<HTMLDivElement>('#summary-content')!,
-    signalViewer: root.querySelector<HTMLDivElement>('#signal-viewer')!,
-    signalOpenLink: root.querySelector<HTMLAnchorElement>('#signal-open')!,
-    saveNameInput: root.querySelector<HTMLInputElement>('#saved-name')!,
-    saveButton: root.querySelector<HTMLButtonElement>('#save-progression')!,
-    savedList: root.querySelector<HTMLUListElement>('#saved-progressions')!,
-    chordHints: root.querySelector<HTMLDivElement>('#chord-suffix-hints')!,
-    midiEnableBtn: root.querySelector<HTMLButtonElement>('#midi-enable')!,
-    midiOutputSelect: root.querySelector<HTMLSelectElement>('#midi-output')!,
-    midiStatusText: root.querySelector<HTMLParagraphElement>('#midi-status')!,
+  armonizacionSelect: root.querySelector<HTMLSelectElement>('#armonizacion')!,
+  armonizacionContainer: root.querySelector<HTMLDivElement>('#armonizacion-default')!,
+  octavacionSelect: root.querySelector<HTMLSelectElement>('#octavacion')!,
+  bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
+  inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
+  inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
+  recalculateInversionsBtn: root.querySelector<HTMLButtonElement>('#recalculate-inversions')!,
+  generateBtn: root.querySelector<HTMLButtonElement>('#generate')!,
+  playBtn: root.querySelector<HTMLButtonElement>('#play')!,
+  downloadBtn: root.querySelector<HTMLButtonElement>('#download')!,
+  errorList: root.querySelector<HTMLDivElement>('#errors')!,
+  summary: root.querySelector<HTMLDivElement>('#summary-content')!,
+  signalViewer: root.querySelector<HTMLDivElement>('#signal-viewer')!,
+  signalOpenLink: root.querySelector<HTMLAnchorElement>('#signal-open')!,
+  chordHints: root.querySelector<HTMLDivElement>('#chord-suffix-hints')!,
+  midiEnableBtn: root.querySelector<HTMLButtonElement>('#midi-enable')!,
+  midiOutputSelect: root.querySelector<HTMLSelectElement>('#midi-output')!,
+  midiStatusText: root.querySelector<HTMLParagraphElement>('#midi-status')!,
   };
 }
 
@@ -635,21 +615,6 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     const bpm = Number.isFinite(value) ? Math.min(220, Math.max(60, value)) : 120;
     (event.target as HTMLInputElement).value = String(bpm);
     setBpm(bpm);
-  });
-
-  refs.seedInput.addEventListener('change', (event) => {
-    const value = (event.target as HTMLInputElement).value;
-    if (value === '') {
-      setSeed(null);
-      return;
-    }
-    const seed = Number.parseInt(value, 10);
-    if (Number.isNaN(seed)) {
-      (event.target as HTMLInputElement).value = '';
-      setSeed(null);
-    } else {
-      setSeed(seed);
-    }
   });
 
   refs.inversionShiftUpBtn.addEventListener('click', () => {
@@ -786,16 +751,6 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
     openSignal();
   });
 
-  refs.saveButton.addEventListener('click', () => {
-    saveCurrentProgression(refs.saveNameInput.value);
-  });
-
-  refs.saveNameInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      refs.saveButton.click();
-    }
-  });
 }
 
 async function handleGenerate(refs: UiRefs): Promise<GenerationResult | undefined> {
@@ -868,7 +823,6 @@ function updateUi(state: AppState, refs: UiRefs): void {
   if (Number.parseFloat(refs.bpmInput.value) !== state.bpm) {
     refs.bpmInput.value = String(state.bpm);
   }
-  refs.seedInput.value = state.seed === null || Number.isNaN(state.seed) ? '' : String(state.seed);
 
   const armonizacionEnabled = state.modoDefault === 'Tradicional';
   refs.armonizacionSelect.disabled = !armonizacionEnabled;
@@ -880,7 +834,6 @@ function updateUi(state: AppState, refs: UiRefs): void {
   renderErrors(state.errors, refs);
   renderSummary(state, refs.summary);
   renderSignalArea(state, refs);
-  renderSavedProgressions(state, refs);
   renderMidi(state, refs);
 
   const progressionEmpty = state.progressionInput.trim().length === 0;
@@ -888,24 +841,11 @@ function updateUi(state: AppState, refs: UiRefs): void {
   refs.generateBtn.disabled = state.isGenerating || progressionEmpty || hasBlockingErrors;
   refs.playBtn.disabled =
     state.isGenerating || (!state.generated && (progressionEmpty || hasBlockingErrors));
-  refs.playBtn.textContent = state.isPlaying ? 'Detener' : 'Reproducir';
+  refs.playBtn.textContent = state.isPlaying ? '⏹' : '▶';
   refs.downloadBtn.disabled = state.isGenerating || !state.generated;
   refs.recalculateInversionsBtn.disabled =
     state.isGenerating || progressionEmpty || hasBlockingErrors || state.chords.length === 0;
-  refs.saveButton.disabled = state.progressionInput.trim().length === 0 || state.errors.length > 0;
-  refs.saveButton.textContent = state.activeProgressionId ? 'Actualizar progresión' : 'Guardar progresión';
-
-  if (state.activeProgressionId !== lastActiveProgressionId && document.activeElement !== refs.saveNameInput) {
-    const active = state.savedProgressions.find((item) => item.id === state.activeProgressionId);
-    refs.saveNameInput.value = active ? active.name : '';
-  }
-  if (document.activeElement !== refs.saveNameInput) {
-    refs.saveNameInput.placeholder = state.activeProgressionId
-      ? 'Actualizar nombre de la progresión'
-      : 'Intro en C mayor';
-  }
   refreshChordSuffixHints(refs);
-  lastActiveProgressionId = state.activeProgressionId;
 }
 
 function populateSelect(select: HTMLSelectElement, options: { value: string; label: string }[]): void {
@@ -971,77 +911,6 @@ function renderSignalArea(state: AppState, refs: UiRefs): void {
   }
 }
 
-const savedDateFormatter = new Intl.DateTimeFormat('es', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-});
-
-function renderSavedProgressions(state: AppState, refs: UiRefs): void {
-  const list = refs.savedList;
-  list.innerHTML = '';
-
-  if (!state.savedProgressions.length) {
-    const emptyItem = document.createElement('li');
-    emptyItem.className = 'saved-list__empty';
-    emptyItem.textContent = 'Aún no hay progresiones guardadas.';
-    list.appendChild(emptyItem);
-    return;
-  }
-
-  state.savedProgressions.forEach((item) => {
-    const entry = document.createElement('li');
-    entry.className = 'saved-list__item';
-    if (state.activeProgressionId === item.id) {
-      entry.classList.add('saved-list__item--active');
-    }
-
-    const info = document.createElement('div');
-    info.className = 'saved-list__info';
-
-    const name = document.createElement('span');
-    name.className = 'saved-list__name';
-    name.textContent = item.name;
-
-    const preview = document.createElement('span');
-    preview.className = 'saved-list__preview';
-    preview.textContent = item.progression;
-
-    const timestamp = document.createElement('span');
-    timestamp.className = 'saved-list__timestamp';
-    const updatedAt = new Date(item.updatedAt);
-    if (!Number.isNaN(updatedAt.getTime())) {
-      timestamp.textContent = `Actualizado ${savedDateFormatter.format(updatedAt)}`;
-    } else {
-      timestamp.textContent = '';
-    }
-
-    info.append(name, preview, timestamp);
-
-    const actions = document.createElement('div');
-    actions.className = 'saved-list__actions';
-
-    const loadButton = document.createElement('button');
-    loadButton.type = 'button';
-    loadButton.className = 'saved-list__action';
-    loadButton.textContent = 'Cargar';
-    loadButton.addEventListener('click', () => {
-      loadSavedProgression(item.id);
-    });
-
-    const deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.className = 'saved-list__action saved-list__action--danger';
-    deleteButton.textContent = 'Eliminar';
-    deleteButton.addEventListener('click', () => {
-      deleteSavedProgression(item.id);
-    });
-
-    actions.append(loadButton, deleteButton);
-    entry.append(info, actions);
-    list.appendChild(entry);
-  });
-}
-
 function renderMidi(state: AppState, refs: UiRefs): void {
   const { midiStatus, midiOutputs, selectedMidiOutputId } = state;
   const baseMessage = MIDI_STATUS_MESSAGES[midiStatus];
@@ -1051,7 +920,10 @@ function renderMidi(state: AppState, refs: UiRefs): void {
     refs.midiStatusText.textContent = baseMessage;
   }
 
-  refs.midiEnableBtn.textContent = MIDI_BUTTON_LABELS[midiStatus];
+  const buttonState = MIDI_BUTTON_STATES[midiStatus];
+  refs.midiEnableBtn.textContent = buttonState.icon;
+  refs.midiEnableBtn.title = buttonState.tooltip;
+  refs.midiEnableBtn.setAttribute('aria-label', buttonState.tooltip);
   refs.midiEnableBtn.disabled = midiStatus === 'pending' || midiStatus === 'unavailable';
 
   const select = refs.midiOutputSelect;
