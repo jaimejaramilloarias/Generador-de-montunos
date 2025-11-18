@@ -71,19 +71,6 @@ def _normalise_int_sequence(
     return result[:length]
 
 
-def _is_extended_chord(symbol: str) -> bool:
-    base = symbol.split("/")[0]
-    sufijo = ""
-    for idx, char in enumerate(base):
-        if char.isalpha() and char.upper() in "ABCDEFG" and idx == 0:
-            continue
-        sufijo = base[idx:]
-        break
-    if not sufijo:
-        return False
-    return any(token in sufijo for token in ("9", "11", "13"))
-
-
 def _normalise_nested_notes(
     values: Optional[Sequence[Optional[Sequence[str]]]], length: int
 ) -> List[Optional[List[str]]]:
@@ -163,10 +150,6 @@ def generate_montuno(
         )
 
         inversiones = [inv or default_inv for inv, default_inv in zip(inversiones, default_inversions)]
-
-        for idx, asign in enumerate(asignaciones_all):
-            if modos[idx] != "Extendido" and _is_extended_chord(asign[0]):
-                modos[idx] = "Extendido"
 
         segmentos: List[_Segment] = []
         start = 0

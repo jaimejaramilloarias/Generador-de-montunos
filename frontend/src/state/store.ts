@@ -21,7 +21,6 @@ import {
 } from '../types/constants';
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
-import { isExtendedChordName } from '../utils/chords';
 import { deriveRegisterOffset, resolveInversionChain, stepInversionPitch } from '../music/inversions';
 import { deriveApproachNotes } from '../music/approachNotes';
 
@@ -166,18 +165,16 @@ function buildChords(
     const armonizacion = chord.armonizacion ?? prev?.armonizacion ?? base.armonizacionDefault;
     const octavacion = prev?.octavacion ?? base.octavacionDefault;
     const forcedInversion = chord.forcedInversion ?? null;
-    const isExtended = isExtendedChordName(chord.name);
     const defaultApproach = deriveApproachNotes(chord.name);
     const approachNotes = normaliseApproachNotes(prev?.approachNotes ?? defaultApproach);
 
     if (prev && prev.name === chord.name) {
       const nextInversion = forcedInversion ?? prev.inversion ?? null;
-      const nextModo = isExtended ? prev.modo ?? 'Extendido' : prev.modo;
       return {
         ...prev,
         index,
         label: chord.raw,
-        modo: nextModo,
+        modo: prev.modo,
         armonizacion,
         octavacion,
         inversion: nextInversion,
@@ -187,12 +184,11 @@ function buildChords(
       } satisfies ChordConfig;
     }
 
-    const nextModo = isExtended ? 'Extendido' : base.modoDefault;
     return {
       index,
       label: chord.raw,
       name: chord.name,
-      modo: nextModo,
+      modo: base.modoDefault,
       armonizacion,
       octavacion: base.octavacionDefault,
       inversion: forcedInversion,
@@ -270,7 +266,7 @@ export function setProgression(progressionInput: string): void {
 
 export function setDefaultModo(modo: Modo): void {
   const chords = state.chords.map((chord) =>
-    isExtendedChordName(chord.name) ? chord : { ...chord, modo }
+    chord.modo === state.modoDefault ? { ...chord, modo } : chord
   );
   updateState({ modoDefault: modo, chords });
   markDirty();
@@ -335,9 +331,6 @@ export function setChord(
       ...(normalisedApproach !== undefined ? { approachNotes: normalisedApproach } : {}),
       inversion: patch.inversion === undefined ? chord.inversion : patch.inversion,
     };
-    if (isExtendedChordName(next.name) && patch.modo === undefined) {
-      next.modo = 'Extendido';
-    }
     return next;
   });
   updateState({ chords });

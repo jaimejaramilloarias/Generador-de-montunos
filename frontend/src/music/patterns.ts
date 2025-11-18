@@ -1,4 +1,4 @@
-import type { Variacion } from '../types';
+import type { Modo, Variacion } from '../types';
 import type { VoiceLayout } from './chords';
 
 export type VoiceRole = keyof VoiceLayout;
@@ -90,7 +90,7 @@ const salsaBase: Record<Variacion, PatternStep[]> = {
   ],
 };
 
-export function getPattern(modo: 'Tradicional' | 'Extendido' | 'Salsa', variation: Variacion): PatternStep[] {
+export function getPattern(modo: Modo, variation: Variacion): PatternStep[] {
   const source = modo === 'Salsa' ? salsaBase : tradBase;
   return source[variation].map((step) => ({
     ...step,

@@ -70,44 +70,44 @@ describe('state/store saved progressions', () => {
     expect(state.activeProgressionId).toBeNull();
   });
 
-  it('detecta acordes extendidos y fuerza el modo extendido', () => {
+  it('usa el modo tradicional como predeterminado', () => {
     setProgression('Cmaj9 | Dm7(9) G7');
     const state = getState();
-    expect(state.chords[0]?.modo).toBe('Extendido');
-    expect(state.chords[0]?.inversion).toBeNull();
-    expect(state.chords[1]?.modo).toBe('Extendido');
-    expect(state.chords[2]?.modo).toBe('Tradicional');
+    expect(state.chords.every((chord) => chord.modo === 'Tradicional')).toBe(true);
   });
 
-  it('permite cambiar el modo global a extendido', () => {
+  it('permite cambiar el modo global a salsa', () => {
     setProgression('Cmaj7 F7 | G7 Cmaj7');
-    setDefaultModo('Extendido');
+    setDefaultModo('Salsa');
 
     const state = getState();
-    expect(state.chords.every((chord) => chord.modo === 'Extendido')).toBe(true);
-    expect(state.modoDefault).toBe('Extendido');
+    expect(state.chords.every((chord) => chord.modo === 'Salsa')).toBe(true);
+    expect(state.modoDefault).toBe('Salsa');
   });
 
-  it('mantiene el modo extendido en acordes con tensiones al cambiar el modo global', () => {
-    setProgression('Cmaj9 | Dm7(9) G7');
+  it('mantiene overrides manuales al actualizar el modo global', () => {
+    setProgression('Cmaj9 | Dm9 G9');
+    setChord(0, { modo: 'Salsa' });
+
     setDefaultModo('Tradicional');
 
     const state = getState();
-    expect(state.chords[0]?.modo).toBe('Extendido');
-    expect(state.chords[1]?.modo).toBe('Extendido');
+    expect(state.chords[0]?.modo).toBe('Salsa');
+    expect(state.chords[1]?.modo).toBe('Tradicional');
     expect(state.chords[2]?.modo).toBe('Tradicional');
     expect(state.modoDefault).toBe('Tradicional');
   });
 
-  it('permite ajustar el modo de cualquier acorde, aunque el cifrado sea extendido', () => {
-    setProgression('Cmaj9 | Dm9 G9');
+  it('permite ajustar el modo de cualquier acorde sin imponer un modo oculto', () => {
+    setProgression('Cmaj7 | Dm7 G7');
+    setDefaultModo('Salsa');
     setChord(0, { modo: 'Tradicional' });
-    setChord(2, { modo: 'Salsa' });
+    setChord(2, { modo: 'Tradicional' });
 
     const state = getState();
     expect(state.chords[0]?.modo).toBe('Tradicional');
-    expect(state.chords[1]?.modo).toBe('Extendido');
-    expect(state.chords[2]?.modo).toBe('Salsa');
+    expect(state.chords[1]?.modo).toBe('Salsa');
+    expect(state.chords[2]?.modo).toBe('Tradicional');
   });
 
   it('recalcular inversiones restablece los enlaces ignorando overrides manuales', () => {
