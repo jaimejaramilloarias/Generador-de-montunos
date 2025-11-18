@@ -46,7 +46,7 @@ def _normalizar_nota_tonal(token: str) -> Optional[str]:
     if not token:
         return None
     if len(token) >= 2 and token[1] in {"b", "#"}:
-        base = token[:2].upper()
+        base = token[0].upper() + token[1]
         resto = token[2:]
     else:
         base = token[0].upper()

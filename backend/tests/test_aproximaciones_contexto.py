@@ -17,3 +17,20 @@ def test_preparar_aproximaciones_usa_naturales_por_defecto():
 
     assert len(aproximaciones) == 3
     assert all(item["notas"] == ["D", "F", "A", "B"] for item in aproximaciones)
+
+
+def test_marcadores_se_mantienen_hasta_ser_reemplazados():
+    progresion = "[ ] Am7 | E7 | Am7 | [Bb C#] Dm7 | A7 | [ ] Fmaj7 | [Ab] G7 | [ ] C |"
+
+    _, _, aproximaciones = salsa.procesar_progresion_salsa(progresion)
+
+    assert aproximaciones == [
+        ["D", "F", "A", "B"],
+        ["D", "F", "A", "B"],
+        ["D", "F", "A", "B"],
+        ["C#", "F", "A", "Bb"],
+        ["C#", "F", "A", "Bb"],
+        ["D", "F", "A", "B"],
+        ["D", "F", "Ab", "B"],
+        ["D", "F", "A", "B"],
+    ]
