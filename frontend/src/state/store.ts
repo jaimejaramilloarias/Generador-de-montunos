@@ -18,12 +18,12 @@ import {
   MODOS,
   OCTAVACIONES,
   VARIACIONES,
-  DEFAULT_SALSA_APPROACH_NOTES,
 } from '../types/constants';
 import { loadPreferences, savePreferences } from '../storage/preferences';
 import { parseProgression } from '../utils/progression';
 import { isExtendedChordName } from '../utils/chords';
 import { deriveRegisterOffset, resolveInversionChain, stepInversionPitch } from '../music/inversions';
+import { deriveApproachNotes } from '../music/approachNotes';
 
 const listeners = new Set<(state: AppState) => void>();
 
@@ -157,7 +157,6 @@ function buildChords(
   progressionInput: string,
   base: Pick<AppState, 'modoDefault' | 'armonizacionDefault' | 'octavacionDefault' | 'chords'>
 ): { chords: ChordConfig[]; errors: string[] } {
-  const defaultApproach = normaliseApproachNotes(DEFAULT_SALSA_APPROACH_NOTES.join(', '));
   const parsed = parseProgression(progressionInput, { armonizacionDefault: base.armonizacionDefault });
   const previous = base.chords;
   const chords = parsed.chords.map((chord, index) => {
@@ -166,6 +165,7 @@ function buildChords(
     const octavacion = prev?.octavacion ?? base.octavacionDefault;
     const forcedInversion = chord.forcedInversion ?? null;
     const isExtended = isExtendedChordName(chord.name);
+    const defaultApproach = deriveApproachNotes(chord.name);
     const approachNotes = normaliseApproachNotes(prev?.approachNotes ?? defaultApproach);
 
     if (prev && prev.name === chord.name) {
