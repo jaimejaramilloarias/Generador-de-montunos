@@ -1,5 +1,7 @@
 from pathlib import Path
 import sys
+from pathlib import Path
+import sys
 from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -28,44 +30,40 @@ def _stub_writer(calls, key):
     return _impl
 
 
-def test_extendido_is_used_when_set_as_default():
-    calls = {"trad": 0, "ext": 0}
-    stub_ext = _stub_writer(calls, "ext")
+def test_traditional_is_used_when_set_as_default():
+    calls = {"trad": 0, "salsa": 0}
+    stub_salsa = _stub_writer(calls, "salsa")
     stub_trad = _stub_writer(calls, "trad")
 
-    with patch.object(modos, "montuno_extendido", stub_ext), patch.object(
+    with patch.object(modos, "montuno_salsa", stub_salsa), patch.object(
         modos, "montuno_tradicional", stub_trad
-    ), patch.dict(
-        modos.MODOS_DISPONIBLES, {"Extendido": stub_ext, "Tradicional": stub_trad}
-    ):
+    ), patch.dict(modos.MODOS_DISPONIBLES, {"Salsa": stub_salsa, "Tradicional": stub_trad}):
         generate_montuno(
             "C∆ F7",
             clave_config=CLAVES["Clave 2-3"],
-            modo_default="Extendido",
+            modo_default="Tradicional",
             armonizacion_default="Octavas",
             variacion="A",
             inversion="root",
             reference_root=Path("backend/reference_midi_loops"),
         )
 
-    assert calls["ext"] == 1
-    assert calls["trad"] == 0
+    assert calls["trad"] == 1
+    assert calls["salsa"] == 0
 
 
 def test_missing_modo_entries_fall_back_to_default():
-    calls = {"trad": 0, "ext": 0}
-    stub_ext = _stub_writer(calls, "ext")
+    calls = {"trad": 0, "salsa": 0}
+    stub_salsa = _stub_writer(calls, "salsa")
     stub_trad = _stub_writer(calls, "trad")
 
-    with patch.object(modos, "montuno_extendido", stub_ext), patch.object(
+    with patch.object(modos, "montuno_salsa", stub_salsa), patch.object(
         modos, "montuno_tradicional", stub_trad
-    ), patch.dict(
-        modos.MODOS_DISPONIBLES, {"Extendido": stub_ext, "Tradicional": stub_trad}
-    ):
+    ), patch.dict(modos.MODOS_DISPONIBLES, {"Salsa": stub_salsa, "Tradicional": stub_trad}):
         generate_montuno(
             "C∆ F7",
             clave_config=CLAVES["Clave 2-3"],
-            modo_default="Extendido",
+            modo_default="Salsa",
             modo_por_acorde=[None, None],
             armonizacion_default="Octavas",
             variacion="A",
@@ -73,30 +71,28 @@ def test_missing_modo_entries_fall_back_to_default():
             reference_root=Path("backend/reference_midi_loops"),
         )
 
-    assert calls["ext"] == 1
+    assert calls["salsa"] == 1
     assert calls["trad"] == 0
 
 
-def test_extended_chords_force_extended_mode_even_with_traditional_default():
-    calls = {"trad": 0, "ext": 0}
-    stub_ext = _stub_writer(calls, "ext")
+def test_per_chord_modes_override_default():
+    calls = {"trad": 0, "salsa": 0}
+    stub_salsa = _stub_writer(calls, "salsa")
     stub_trad = _stub_writer(calls, "trad")
 
-    with patch.object(modos, "montuno_extendido", stub_ext), patch.object(
+    with patch.object(modos, "montuno_salsa", stub_salsa), patch.object(
         modos, "montuno_tradicional", stub_trad
-    ), patch.dict(
-        modos.MODOS_DISPONIBLES, {"Extendido": stub_ext, "Tradicional": stub_trad}
-    ):
+    ), patch.dict(modos.MODOS_DISPONIBLES, {"Salsa": stub_salsa, "Tradicional": stub_trad}):
         generate_montuno(
             "Cmaj9 F7",
             clave_config=CLAVES["Clave 2-3"],
-            modo_default="Tradicional",
-            modo_por_acorde=["Tradicional", "Tradicional"],
+            modo_default="Salsa",
+            modo_por_acorde=["Tradicional", "Salsa"],
             armonizacion_default="Octavas",
             variacion="A",
             inversion="root",
             reference_root=Path("backend/reference_midi_loops"),
         )
 
-    assert calls["ext"] == 1
+    assert calls["salsa"] == 1
     assert calls["trad"] == 1

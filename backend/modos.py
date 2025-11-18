@@ -185,6 +185,5 @@ def montuno_extendido(
 
 MODOS_DISPONIBLES = {
     "Tradicional": montuno_tradicional,
-    "Extendido": montuno_extendido,
     "Salsa": montuno_salsa,
 }

@@ -121,21 +121,19 @@ describe('generateMontuno', () => {
     expect(Number(result.durationSeconds.toFixed(6))).toBeCloseTo(expectedSeconds, 6);
   });
 
-  it('propaga correctamente los modos extendidos y por acorde', async () => {
+  it('propaga correctamente los modos tradicionales y de salsa por acorde', async () => {
     const customState: AppState = {
       ...baseState,
-      modoDefault: 'Extendido',
+      modoDefault: 'Salsa',
       chords: baseState.chords.map((chord, index) =>
-        index % 2 === 0
-          ? { ...chord, modo: 'Extendido' }
-          : { ...chord, modo: 'Tradicional' }
+        index % 2 === 0 ? { ...chord, modo: 'Tradicional' } : { ...chord, modo: 'Salsa' }
       ),
     };
 
     await generateMontuno(customState);
 
     const [payload] = (generateMontunoRaw as unknown as Mock).mock.calls.at(-1) ?? [];
-    expect(payload.modoDefault).toBe('Extendido');
+    expect(payload.modoDefault).toBe('Salsa');
     expect(payload.chords).toHaveLength(customState.chords.length);
     expect(payload.chords.map((chord: AppState['chords'][number]) => chord.modo)).toEqual(
       customState.chords.map((chord) => chord.modo)
@@ -143,23 +141,27 @@ describe('generateMontuno', () => {
     expect(payload.chords.every((chord: AppState['chords'][number]) => typeof chord.inversion === 'string')).toBe(true);
   });
 
-  it('mantiene disponible el modo extendido como override por acorde con modo global tradicional', async () => {
-    const customState: AppState = {
-      ...baseState,
-      modoDefault: 'Tradicional',
-      chords: baseState.chords.map((chord, index) =>
-        index === 1 ? { ...chord, modo: 'Extendido' } : chord
-      ),
-    };
+  it('utiliza una seed aleatoria cuando no se especifica ninguna', async () => {
+    const originalCrypto = globalThis.crypto;
+    const mockValue = new Uint32Array([4242]);
+    Object.defineProperty(globalThis, 'crypto', {
+      value: {
+        getRandomValues: (arr: Uint32Array) => {
+          arr.set(mockValue);
+          return arr;
+        },
+      },
+      configurable: true,
+    });
+
+    const customState: AppState = { ...baseState, seed: null };
 
     await generateMontuno(customState);
 
     const [payload] = (generateMontunoRaw as unknown as Mock).mock.calls.at(-1) ?? [];
-    expect(payload.modoDefault).toBe('Tradicional');
-    expect(payload.chords.map((chord: AppState['chords'][number]) => chord.modo)).toEqual(
-      customState.chords.map((chord) => chord.modo)
-    );
-    expect(payload.chords.every((chord: AppState['chords'][number]) => typeof chord.inversion === 'string')).toBe(true);
+    expect(payload.seed).toBe(4242);
+
+    Object.defineProperty(globalThis, 'crypto', { value: originalCrypto, configurable: true, writable: true });
   });
 
   it('recorta notas superpuestas cuando cambian los modos por acorde', async () => {

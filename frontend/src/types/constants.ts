@@ -11,7 +11,7 @@ export const CLAVES: Record<string, { label: string; description: string }> = {
   },
 };
 
-export const MODOS: Modo[] = ['Tradicional', 'Extendido', 'Salsa'];
+export const MODOS: Modo[] = ['Tradicional', 'Salsa'];
 export const ARMONIZACIONES: Armonizacion[] = ['Octavas', 'Doble octava', 'Décimas', 'Treceavas'];
 export const OCTAVACIONES: Octavacion[] = ['Original', 'Octava arriba', 'Octava abajo'];
 export const VARIACIONES: Variacion[] = ['A', 'B', 'C', 'D'];

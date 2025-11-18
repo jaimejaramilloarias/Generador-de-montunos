@@ -238,11 +238,17 @@ def _ajustar_rango_flexible(prev_pitch: Optional[int], pitch: int) -> int:
 def _ajustar_primera_voz_grave(pitch: int) -> int:
     """Garantiza que la primera nota grave quede entre C3 y C4."""
 
-    while pitch < RANGO_BAJO_MIN:
-        pitch += 12
-    while pitch > RANGO_BAJO_MAX:
-        pitch -= 12
-    return pitch
+    candidatos: List[int] = []
+    for offset in range(-2, 3):
+        candidato = pitch + 12 * offset
+        while candidato < RANGO_BAJO_MIN:
+            candidato += 12
+        while candidato > RANGO_BAJO_MAX:
+            candidato -= 12
+        candidatos.append(candidato)
+
+    objetivo = RANGO_BAJO_MAX
+    return min(candidatos, key=lambda nota: (abs(nota - objetivo), -nota))
 
 
 def get_bass_pitch(cifrado: str, inversion: str) -> int:
