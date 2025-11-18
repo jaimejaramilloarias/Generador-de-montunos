@@ -18,7 +18,6 @@ import {
   setIsGenerating,
   setProgression,
   subscribe,
-  recalculateInversions,
   resetChordOverrides,
 } from '../state/store';
 import { ARMONIZACIONES, CLAVES, MODOS, OCTAVACIONES } from '../types/constants';
@@ -52,7 +51,6 @@ interface UiRefs {
   bpmInput: HTMLInputElement;
   inversionShiftUpBtn: HTMLButtonElement;
   inversionShiftDownBtn: HTMLButtonElement;
-  recalculateInversionsBtn: HTMLButtonElement;
   generateBtn: HTMLButtonElement;
   playBtn: HTMLButtonElement;
   downloadBtn: HTMLButtonElement;
@@ -505,15 +503,6 @@ function buildLayout(): string {
                 </div>
                 <button
                   type="button"
-                  id="recalculate-inversions"
-                  class="icon-btn icon-btn--wide"
-                  title="Recalcular inversiones para corregir enlaces extraños"
-                  aria-label="Recalcular inversiones"
-                >
-                  ♻
-                </button>
-                <button
-                  type="button"
                   id="reset-overrides"
                   class="icon-btn icon-btn--wide"
                   title="Restablecer ajustes por acorde a los valores por defecto"
@@ -561,7 +550,6 @@ function grabRefs(root: HTMLElement): UiRefs {
     bpmInput: root.querySelector<HTMLInputElement>('#bpm')!,
     inversionShiftUpBtn: root.querySelector<HTMLButtonElement>('#shift-inv-up')!,
     inversionShiftDownBtn: root.querySelector<HTMLButtonElement>('#shift-inv-down')!,
-    recalculateInversionsBtn: root.querySelector<HTMLButtonElement>('#recalculate-inversions')!,
     resetOverridesBtn: root.querySelector<HTMLButtonElement>('#reset-overrides')!,
     generateBtn: root.querySelector<HTMLButtonElement>('#generate')!,
     playBtn: root.querySelector<HTMLButtonElement>('#play')!,
@@ -627,10 +615,6 @@ function bindStaticEvents(refs: UiRefs, root: HTMLElement): void {
 
   refs.inversionShiftDownBtn.addEventListener('click', () => {
     shiftAllInversions(-1);
-  });
-
-  refs.recalculateInversionsBtn.addEventListener('click', () => {
-    recalculateInversions();
   });
 
   refs.resetOverridesBtn.addEventListener('click', () => {
@@ -850,8 +834,6 @@ function updateUi(state: AppState, refs: UiRefs): void {
     state.isGenerating || (!state.generated && (progressionEmpty || hasBlockingErrors));
   refs.playBtn.textContent = state.isPlaying ? '⏹' : '▶';
   refs.downloadBtn.disabled = state.isGenerating || !state.generated;
-  refs.recalculateInversionsBtn.disabled =
-    state.isGenerating || progressionEmpty || hasBlockingErrors || state.chords.length === 0;
   refs.resetOverridesBtn.disabled =
     state.isGenerating || progressionEmpty || hasBlockingErrors || state.chords.length === 0;
   refreshChordSuffixHints(refs);
