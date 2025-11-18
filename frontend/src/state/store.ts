@@ -34,6 +34,14 @@ function createId(): string {
   return `prog-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 }
 
+function normaliseApproachNotes(input: string): string {
+  return input
+    .split(',')
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .join(', ');
+}
+
 function normaliseSavedProgressions(list?: SavedProgression[]): SavedProgression[] {
   if (!list || !Array.isArray(list) || list.length === 0) {
     return [];
@@ -149,7 +157,7 @@ function buildChords(
   progressionInput: string,
   base: Pick<AppState, 'modoDefault' | 'armonizacionDefault' | 'octavacionDefault' | 'chords'>
 ): { chords: ChordConfig[]; errors: string[] } {
-  const defaultApproach = DEFAULT_SALSA_APPROACH_NOTES.join(', ');
+  const defaultApproach = normaliseApproachNotes(DEFAULT_SALSA_APPROACH_NOTES.join(', '));
   const parsed = parseProgression(progressionInput, { armonizacionDefault: base.armonizacionDefault });
   const previous = base.chords;
   const chords = parsed.chords.map((chord, index) => {
@@ -158,7 +166,7 @@ function buildChords(
     const octavacion = prev?.octavacion ?? base.octavacionDefault;
     const forcedInversion = chord.forcedInversion ?? null;
     const isExtended = isExtendedChordName(chord.name);
-    const approachNotes = prev?.approachNotes ?? defaultApproach;
+    const approachNotes = normaliseApproachNotes(prev?.approachNotes ?? defaultApproach);
 
     if (prev && prev.name === chord.name) {
       const nextInversion = forcedInversion ?? prev.inversion ?? null;
@@ -166,6 +174,7 @@ function buildChords(
       return {
         ...prev,
         index,
+        label: chord.raw,
         modo: nextModo,
         armonizacion,
         octavacion,
@@ -179,6 +188,7 @@ function buildChords(
     const nextModo = isExtended ? 'Extendido' : base.modoDefault;
     return {
       index,
+      label: chord.raw,
       name: chord.name,
       modo: nextModo,
       armonizacion,
@@ -309,8 +319,10 @@ export function setSeed(seed: number | null): void {
 
 export function setChord(
   index: number,
-  patch: Partial<Omit<ChordConfig, 'index' | 'name' | 'isRecognized'>>
+  patch: Partial<Omit<ChordConfig, 'index' | 'name' | 'label' | 'isRecognized'>>
 ): void {
+  const normalisedApproach =
+    patch.approachNotes === undefined ? undefined : normaliseApproachNotes(patch.approachNotes);
   const chords = state.chords.map((chord) => {
     if (chord.index !== index) {
       return chord;
@@ -318,6 +330,7 @@ export function setChord(
     const next: ChordConfig = {
       ...chord,
       ...patch,
+      ...(normalisedApproach !== undefined ? { approachNotes: normalisedApproach } : {}),
       inversion: patch.inversion === undefined ? chord.inversion : patch.inversion,
     };
     if (isExtendedChordName(next.name) && patch.modo === undefined) {

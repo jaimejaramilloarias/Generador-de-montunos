@@ -7,6 +7,7 @@ export type ManualEditType = 'modify' | 'add' | 'delete';
 
 export interface ChordConfig {
   index: number;
+  label: string;
   name: string;
   modo: Modo;
   armonizacion: Armonizacion;

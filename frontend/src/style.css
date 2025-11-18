@@ -452,31 +452,6 @@ input[type='number'] {
   padding-left: 1.25rem;
 }
 
-.summary {
-  background: rgba(8, 20, 42, 0.7);
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 1rem 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.summary--compact {
-  margin: 0;
-}
-
-.summary h2 {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.summary__content p {
-  margin: 0.4rem 0;
-  color: rgba(235, 244, 255, 0.85);
-  font-size: 0.9rem;
-}
-
 .signal-embed {
   background: radial-gradient(circle at 20% 20%, rgba(69, 113, 255, 0.12), transparent 35%),
     rgba(5, 13, 30, 0.8);
@@ -860,9 +835,6 @@ input[type='number'] {
   }
   .app__body {
     grid-template-columns: 1fr;
-  }
-  .summary {
-    order: -1;
   }
   .signal-embed__grid {
     grid-template-columns: 1fr;
