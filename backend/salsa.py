@@ -21,10 +21,12 @@ from .midi_utils import (
 # ========================
 INVERSIONS = ["root", "third", "fifth", "seventh"]
 
-# Notas que funcionan como aproximaciones en las plantillas de salsa.  Si el
-# acorde cambia justo al inicio de la figura se ajustan al sonido estructural
-# más cercano.
+# Notas que funcionan como aproximaciones en las plantillas de salsa.
 APPROACH_NOTES = {"D", "A", "B", "D#", "F", "G#", "C#"}
+
+# Aproximaciones por defecto (todas naturales) siguiendo la secuencia 2, 4, 6,
+# 7.
+DEFAULT_APPROACH_NOTES = ["D", "F", "A", "B"]
 
 # Switch to enable adjusting approach notes to structural tones when a chord
 # change occurs at the beginning of the pattern.  Set to ``True`` to keep the
@@ -141,137 +143,77 @@ def _note_name_for_letter(letter: str, pc: int) -> str:
     return f"{letter.upper()}{accidental}"
 
 
-def _calcular_aproximaciones_default(cifrado: str) -> List[str]:
-    """Devuelve las 4 notas de aproximación (2, 4, 6, 7) según las reglas nuevas."""
+def get_default_approach_notes_for_chord(_: str) -> List[str]:
+    """Devuelve las 4 aproximaciones naturales (2, 4, 6, 7)."""
 
-    root, ints = _detalles_intervalos(cifrado)
-    text = cifrado.lower()
-    third = ints[1] if len(ints) > 1 else 4
-    fifth = ints[2] if len(ints) > 2 else 7
-    seventh = ints[3] if len(ints) > 3 else None
-
-    has_b9 = "b9" in text
-    has_sharp9 = "#9" in text or "+9" in text
-    has_natural_9 = "9" in text and not has_b9 and not has_sharp9
-
-    if has_b9:
-        second_int = 1
-    elif has_sharp9:
-        second_int = 3
-    elif has_natural_9:
-        second_int = 2
-    else:
-        second_int = 2
-
-    fifth_simple = fifth - (ints[0] if ints else 0)
-    use_flats = _prefer_flat_names(cifrado) or has_b9 or fifth_simple == 6
-
-    minor_third = third - (ints[0] if ints else 0) == 3 or "m7(b5)" in text or "ø" in text or "º" in text
-    fourth_int = 5 if minor_third else 6
-    if fifth_simple == 6:
-        sixth_int = 8
-    elif fifth_simple == 8:
-        sixth_int = 8
-    else:
-        sixth_int = 9
-
-    if seventh is not None or "7" in text:
-        seventh_int = seventh if seventh is not None else 10
-    else:
-        seventh_int = 10
-
-    pcs = [second_int, fourth_int, sixth_int, seventh_int]
-    return [_pc_to_note(root + interval, use_flats) for interval in pcs]
+    return list(DEFAULT_APPROACH_NOTES)
 
 
-def get_default_approach_notes_for_chord(cifrado: str) -> List[str]:
-    """Wrapper público para exponer las 4 aproximaciones por acorde."""
+def _indice_aproximacion_para_nota(note: str) -> Optional[int]:
+    """Asigna una nota a su rol de aproximación (2, 4, 6 o 7)."""
 
-    return _calcular_aproximaciones_default(cifrado)
+    if not note:
+        return None
+    letra = note[0].upper()
+    if letra in {"C", "D"}:
+        return 0
+    if letra in {"E", "F"}:
+        return 1
+    if letra in {"G", "A"}:
+        return 2
+    if letra == "B":
+        return 3
+    return None
 
 
-def _normalizar_lista_aproximaciones(raw: Optional[Iterable[str]], defaults: List[str]) -> List[str]:
+def _aproximaciones_desde_marcador(marker: str) -> List[str]:
+    """Interpreta un marcador ``[...]`` y devuelve las cuatro aproximaciones."""
+
+    contenido = marker.strip()[1:-1].strip()
+    aproximaciones = list(DEFAULT_APPROACH_NOTES)
+    if not contenido:
+        return aproximaciones
+
+    tokens = re.split(r"[\s,]+", contenido)
+    for token in tokens:
+        nota = _normalizar_nota_tonal(token)
+        if not nota:
+            continue
+        idx = _indice_aproximacion_para_nota(nota)
+        if idx is not None:
+            aproximaciones[idx] = nota
+    return aproximaciones
+
+
+def _normalizar_lista_aproximaciones(raw: Optional[Iterable[str]]) -> List[str]:
     if raw is None:
-        return defaults
+        return list(DEFAULT_APPROACH_NOTES)
     cleaned: List[str] = []
     for token in raw:
         norm = _normalizar_nota_tonal(str(token))
         if norm:
             cleaned.append(norm)
     if len(cleaned) < 4:
-        cleaned.extend(defaults[len(cleaned) :])
+        cleaned.extend(DEFAULT_APPROACH_NOTES[len(cleaned) :])
     return cleaned[:4]
-
-
-def _ajustar_aproximaciones_por_contexto(
-    aproximaciones_por_acorde: List[List[str]],
-    asignaciones: List[Tuple[str, List[int], str, Optional[str]]],
-) -> List[List[str]]:
-    if not aproximaciones_por_acorde:
-        return []
-
-    estructurales = [_pitch_classes_en_acorde(cifrado) for cifrado, _, _, _ in asignaciones]
-    resultado: List[List[str]] = []
-
-    for idx, notas in enumerate(aproximaciones_por_acorde):
-        vecinos: Set[int] = set()
-        if idx > 0:
-            vecinos.update(estructurales[idx - 1])
-        if idx + 1 < len(estructurales):
-            vecinos.update(estructurales[idx + 1])
-        if not vecinos:
-            resultado.append(notas)
-            continue
-
-        ajustadas: List[str] = []
-        for nota in notas:
-            pc_original = _note_name_to_pc(nota)
-            if pc_original is None:
-                ajustadas.append(nota)
-                continue
-
-            letra = nota[0].upper()
-            candidatos = [pc for pc in vecinos if _pc_distance(pc_original, pc) == 1]
-            if not candidatos:
-                ajustadas.append(nota)
-                continue
-
-            preferidos = [pc for pc in candidatos if _is_pc_for_letter(letra, pc, max_distance=1)]
-            objetivo = (sorted(preferidos) or sorted(candidatos))[0]
-
-            if objetivo != pc_original:
-                if preferidos:
-                    ajustadas.append(_note_name_for_letter(letra, objetivo))
-                else:
-                    usar_bemoles = "b" in nota and "#" not in nota
-                    ajustadas.append(_pc_to_note(objetivo, usar_bemoles))
-            else:
-                ajustadas.append(nota)
-
-        resultado.append(ajustadas)
-
-    return resultado
 
 
 def _preparar_aproximaciones(
     aproximaciones_por_acorde: Optional[List[Optional[List[str]]]],
-    asignaciones: List[Tuple[str, List[int], str, Optional[str]]],
+    total_acordes: int,
 ) -> List[Dict[str, object]]:
     notas_por_acorde: List[List[str]] = []
-    for idx, (cifrado, _, _, _) in enumerate(asignaciones):
-        defaults = _calcular_aproximaciones_default(cifrado)
+    for idx in range(total_acordes):
         raw = (
             aproximaciones_por_acorde[idx]
             if aproximaciones_por_acorde and idx < len(aproximaciones_por_acorde)
             else None
         )
-        notas_por_acorde.append(_normalizar_lista_aproximaciones(raw, defaults))
-
-    ajustadas = _ajustar_aproximaciones_por_contexto(notas_por_acorde, asignaciones)
+        notas_por_acorde.append(_normalizar_lista_aproximaciones(raw))
 
     return [
         {"tokens": set(APPROACH_NOTES), "notas": notas}
-        for notas in ajustadas
+        for notas in notas_por_acorde
     ]
 
 
@@ -463,7 +405,7 @@ def traducir_nota(
     fifth = ints[2] if len(ints) > 2 else 7
     seventh = ints[3] if len(ints) > 3 else None
 
-    aprox_default = _calcular_aproximaciones_default(cifrado)
+    aprox_default = list(DEFAULT_APPROACH_NOTES)
 
     def intervalo_aprox(role: str) -> int:
         return _intervalo_por_nota_aproximacion(role, root, approx_cfg, aprox_default)
@@ -572,7 +514,7 @@ def procesar_progresion_salsa(
     armonizacion_default: Optional[str] = None,
     *,
     inicio_cor: int = 0,
-) -> Tuple[List[Tuple[str, List[int], str, Optional[str]]], int]:
+) -> Tuple[List[Tuple[str, List[int], str, Optional[str]]], int, List[List[str]]]:
     """Procesa la progresión reconociendo extensiones específicas de salsa."""
 
     import re
@@ -592,10 +534,12 @@ def procesar_progresion_salsa(
     num_compases = len(segmentos)
 
     resultado: List[Tuple[str, List[int], str, Optional[str]]] = []
+    aproximaciones_por_acorde: List[List[str]] = []
     indice_patron = _indice_para_corchea(inicio_cor)
     posicion = 0
     arm_actual = (armonizacion_default or "").capitalize()
     inv_forzado: Optional[str] = None
+    aproximaciones_actuales = list(DEFAULT_APPROACH_NOTES)
 
     def procesar_token(token: str) -> Tuple[Optional[str], Optional[str]]:
         """Return ``(chord, inversion)`` parsed from ``token``.
@@ -643,23 +587,28 @@ def procesar_progresion_salsa(
         return token, inversion
 
     for seg in segmentos:
-        tokens = [t for t in seg.split() if t]
-        acordes: List[Tuple[str, str, Optional[str]]] = []
+        tokens = re.findall(r"\[[^\]]*\]|\S+", seg)
+        acordes: List[Tuple[str, str, Optional[str], List[str]]] = []
         for tok in tokens:
+            if re.match(r"^\[.*\]$", tok):
+                aproximaciones_actuales = _aproximaciones_desde_marcador(tok)
+                continue
+
             nombre, inv_local = procesar_token(tok)
             if nombre is None:
                 if inv_local is not None:
                     inv_forzado = inv_local
                 continue
-            acordes.append((nombre, arm_actual, inv_local or inv_forzado))
+            acordes.append((nombre, arm_actual, inv_local or inv_forzado, list(aproximaciones_actuales)))
             inv_forzado = None
         if len(acordes) == 1:
             g1 = _siguiente_grupo(indice_patron)
             g2 = _siguiente_grupo(indice_patron + 1)
             dur = g1 + g2
             indices = list(range(posicion, posicion + dur))
-            nombre, arm, inv = acordes[0]
+            nombre, arm, inv, aprox = acordes[0]
             resultado.append((nombre, indices, arm, inv))
+            aproximaciones_por_acorde.append(aprox)
             posicion += dur
             indice_patron += 2
         elif len(acordes) == 2:
@@ -673,15 +622,17 @@ def procesar_progresion_salsa(
             posicion += g2
             indice_patron += 1
 
-            (n1, a1, i1), (n2, a2, i2) = acordes
+            (n1, a1, i1, ap1), (n2, a2, i2, ap2) = acordes
             resultado.append((n1, indices1, a1, i1))
             resultado.append((n2, indices2, a2, i2))
+            aproximaciones_por_acorde.append(ap1)
+            aproximaciones_por_acorde.append(ap2)
         elif len(acordes) == 0:
             continue
         else:
             raise ValueError("Cada segmento debe contener uno o dos acordes: " f"{seg}")
 
-    return resultado, num_compases
+    return resultado, num_compases, aproximaciones_por_acorde
 
 
 # ========================
@@ -714,16 +665,27 @@ def montuno_salsa(
     """
     # Procesa la progresión. Cada compás puede contener uno o dos acordes
     if asignaciones_custom is None:
-        asignaciones, _ = procesar_progresion_salsa(
+        asignaciones, _, aproximaciones_auto = procesar_progresion_salsa(
             progresion_texto, inicio_cor=inicio_cor
         )
     else:
         asignaciones = asignaciones_custom
+        aproximaciones_auto = []
 
     octavaciones = octavaciones_custom or [octavacion_default or "Original"] * len(
         asignaciones
     )
-    aproximaciones = _preparar_aproximaciones(aproximaciones_por_acorde, asignaciones)
+    fuente_aproximaciones: Optional[List[Optional[List[str]]]]
+    if aproximaciones_por_acorde is not None:
+        fuente_aproximaciones = aproximaciones_por_acorde
+    elif aproximaciones_auto:
+        fuente_aproximaciones = aproximaciones_auto
+    else:
+        fuente_aproximaciones = None
+
+    aproximaciones = _preparar_aproximaciones(
+        fuente_aproximaciones, len(asignaciones)
+    )
 
     # --------------------------------------------------------------
     # Selección de la inversión para cada acorde enlazando la voz grave

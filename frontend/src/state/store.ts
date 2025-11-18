@@ -166,7 +166,7 @@ function buildChords(
     const armonizacion = chord.armonizacion ?? prev?.armonizacion ?? base.armonizacionDefault;
     const octavacion = prev?.octavacion ?? base.octavacionDefault;
     const forcedInversion = chord.forcedInversion ?? null;
-    const defaultApproach = deriveApproachNotes(chord.name);
+    const defaultApproach = chord.approachNotes ?? deriveApproachNotes();
     const approachNotes = normaliseApproachNotes(prev?.approachNotes ?? defaultApproach);
 
     if (prev && prev.name === chord.name) {

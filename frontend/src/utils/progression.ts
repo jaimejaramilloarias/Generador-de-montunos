@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Armonizacion, Inversion, ParsedChord } from '../types';
+import { DEFAULT_APPROACH_NOTES } from '../music/approachNotes';
 import { applyChordReplacements } from '../music/chordNormalizer';
 import { isRecognizedChordSymbol } from './chordValidation';
 
@@ -22,6 +23,40 @@ const INVERSION_MAP: Record<string, Inversion> = {
   '5': 'fifth',
   '7': 'seventh',
 };
+
+function normaliseNoteToken(token: string): string | null {
+  const trimmed = token.trim();
+  if (!trimmed) return null;
+  const [letter, ...rest] = trimmed;
+  if (!letter) return null;
+  return `${letter.toUpperCase()}${rest.join('')}`;
+}
+
+function approachIndexForNote(note: string): number | null {
+  const letter = note[0]?.toUpperCase();
+  if (!letter) return null;
+  if (letter === 'B') return 3;
+  if (letter === 'G' || letter === 'A') return 2;
+  if (letter === 'E' || letter === 'F') return 1;
+  if (letter === 'C' || letter === 'D') return 0;
+  return null;
+}
+
+function approachNotesFromMarker(marker: string): string[] {
+  const content = marker.slice(1, -1).trim();
+  const base = [...DEFAULT_APPROACH_NOTES];
+  if (!content) return base;
+
+  const tokens = content.split(/[\s,]+/).filter(Boolean);
+  tokens.forEach((token) => {
+    const note = normaliseNoteToken(token);
+    const index = note ? approachIndexForNote(note) : null;
+    if (note && index !== null) {
+      base[index] = note;
+    }
+  });
+  return base;
+}
 
 export interface ParseProgressionOptions {
   armonizacionDefault: Armonizacion;
@@ -69,20 +104,25 @@ export function parseProgression(
     }
   });
 
+  let approachCurrent = [...DEFAULT_APPROACH_NOTES];
+
   segments.forEach((segment) => {
-    const tokens = segment
-      .split(/\s+/)
-      .map((token) => token.trim())
-      .filter(Boolean);
+    const tokens = segment.match(/\[[^\]]*\]|\S+/g) ?? [];
 
     const segmentChords: {
       raw: string;
       chord: string;
       armonizacion?: Armonizacion;
       inversion?: Inversion;
+      approachNotes: string[];
     }[] = [];
 
     tokens.forEach((token) => {
+      if (token.startsWith('[') && token.endsWith(']')) {
+        approachCurrent = approachNotesFromMarker(token);
+        return;
+      }
+
       const original = token;
       const result = procesarToken(token);
       if (result == null) {
@@ -100,6 +140,7 @@ export function parseProgression(
         chord,
         armonizacion: armonActualFromMarker ? armonActual : undefined,
         inversion: forced ?? undefined,
+        approachNotes: [...approachCurrent],
       });
     });
 
@@ -127,6 +168,7 @@ export function parseProgression(
         raw,
         index: chords.length,
         isRecognized: recognized,
+        approachNotes: chord.approachNotes ?? [...DEFAULT_APPROACH_NOTES],
         ...(armonizacion ? { armonizacion } : {}),
         ...(inversion ? { forcedInversion: inversion } : {}),
       });

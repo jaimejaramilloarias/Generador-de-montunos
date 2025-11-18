@@ -1,23 +1,19 @@
 from backend import salsa
 
 
-def test_aproximacion_se_ajusta_a_vecino_con_misma_letra():
-    asignaciones = [('B7', [], '', None), ('C', [], '', None)]
-    aproximaciones = salsa._preparar_aproximaciones([None, None], asignaciones)
+def test_marcadores_actualizan_aproximaciones():
+    progresion = "[ ] Am7 | E7 | [Bb C#] Dm7 | A7 | [ ] C"
+    asignaciones, _, aproximaciones = salsa.procesar_progresion_salsa(progresion)
 
-    assert aproximaciones[0]["notas"][0] == "C"
-    assert aproximaciones[0]["notas"][1] == "Fb"
-
-
-def test_aproximacion_prefiere_vecino_con_misma_letra():
-    asignaciones = [('F', [], '', None), ('E7', [], '', None), ('G', [], '', None)]
-    aproximaciones = salsa._preparar_aproximaciones([None, None, None], asignaciones)
-
-    assert aproximaciones[1]["notas"][0] == "F"
+    assert aproximaciones[0] == ["D", "F", "A", "B"]
+    assert aproximaciones[1] == ["D", "F", "A", "B"]
+    assert aproximaciones[2] == ["C#", "F", "A", "Bb"]
+    assert aproximaciones[3] == ["C#", "F", "A", "Bb"]
+    assert aproximaciones[4] == ["D", "F", "A", "B"]
 
 
-def test_aproximacion_ajusta_sin_letra_coincidente():
-    asignaciones = [('B7', [], '', None), ('D', [], '', None)]
-    aproximaciones = salsa._preparar_aproximaciones([None, None], asignaciones)
+def test_preparar_aproximaciones_usa_naturales_por_defecto():
+    aproximaciones = salsa._preparar_aproximaciones(None, 3)
 
-    assert aproximaciones[0]["notas"][0] == "D"
+    assert len(aproximaciones) == 3
+    assert all(item["notas"] == ["D", "F", "A", "B"] for item in aproximaciones)
